@@ -1,32 +1,109 @@
 #!/usr/bin/env make -f
+
+# Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+
+# ------------------------------------------------------------------------------
+# de-viz: visualizations for differential expression analysis
+#
+# This script executes a workflow for visual evaluation of a differential
+# expression analysis. Outputs include plots of gene expression distributions by
+# sample before and after normalization, and a heatmap of gene expression
+# values.
+# ------------------------------------------------------------------------------
+
+
 SHELL := /usr/bin/env bash
+MKFILE=$(CURDIR)/$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
+BINDIR=$(shell dirname $(MKFILE))
+define PROG_USAGE
+
+de-viz: visualizations for differential expression analysis; see source code for
+        a complete description of the inputs and outputs
+
+Usage: de-vis [options] ebseqin=rsem.output.txt ebseqout=ebseq.output.txt all
+  Options:
+    heatmap=FILE      plot heatmap of expression values to the given PNG file;
+                      default is '$$workdir/heatmap.png'
+    help              print this help message and exit
+    postnorm=FILE     plot distributions of expression values post-normalization
+                      to this PNG file; default is '$$workdir/post-norm.png'
+    prenorm=FILE      plot distributions of expression values pre-normalization
+                      to this PNG file; default is '$$workdir/pre-norm.png'
+    samples=STRING    override sample labels from the input data files with a
+                      comma-separated list of new labels
+    workdir=DIR       directory in which to place temporary files and, by
+                      default, the output files
+
+endef
+export PROG_USAGE
+
 
 # Program options
-BINDIR=.
-WORKDIR=$(BINDIR)
-RSEMFILE=$(WORKDIR)/expr.rsem.dat
-EBSEQFILE=$(WORKDIR)/diffexp.ebseq.dat
-PNG=$(WORKDIR)/heatmap.png
-ifdef SAMPLES
-  SAMPLEARG= --samples=$(SAMPLES)
+workdir=.
+heatmap=$(workdir)/heatmap.png
+postnorm=$(workdir)/post-norm.png
+prenorm=$(workdir)/pre-norm.png
+ifdef samples
+  samplearg= --samples=$(samples)
 endif
-
-all:						$(WORKDIR) $(PNG)
-
-$(WORKDIR):					
-						test -d $(WORKDIR) || mkdir $(WORKDIR)
-
-$(WORKDIR)/diffexp.molids.txt:			$(EBSEQFILE)
-						tail -n +2 $(EBSEQFILE) | cut -f 1 | tr -d '"' | sort | uniq > $(WORKDIR)/diffexp.molids.txt
-
-$(WORKDIR)/expr.diffexp.rsem.dat:		$(RSEMFILE) $(WORKDIR)/diffexp.molids.txt
-						$(BINDIR)/selex $(WORKDIR)/diffexp.molids.txt <(tail -n +2 $(RSEMFILE) | tr -d '"') > $(WORKDIR)/expr.diffexp.rsem.dat.temp
-						cat <(head -n 1 $(RSEMFILE)) $(WORKDIR)/expr.diffexp.rsem.dat.temp > $(WORKDIR)/expr.diffexp.rsem.dat
-						rm $(WORKDIR)/expr.diffexp.rsem.dat.temp
-
-$(WORKDIR)/expr.diffexp.rsem.dat.withFC:	$(EBSEQFILE) $(WORKDIR)/expr.diffexp.rsem.dat
-						$(BINDIR)/addfc $(WORKDIR)/expr.diffexp.rsem.dat $(EBSEQFILE) > $(WORKDIR)/expr.diffexp.rsem.dat.withFC
+#ebseqinfile=bogusfilethatdoesnotexist
+#ebseqoutfile=bogusfilethatdoesnotexist
 
 
-$(PNG):						$(WORKDIR)/expr.diffexp.rsem.dat.withFC $(RSEMFILE)
-						$(BINDIR)/de-viz $(SAMPLEARG) --before=$(WORKDIR)/before.norm.png --after=$(WORKDIR)/after.norm.png --norm=$(RSEMFILE) --heatmap=$(PNG) --columns < $(WORKDIR)/expr.diffexp.rsem.dat.withFC
+# Temp files
+de_molids=$(workdir)/diffexp.molids.txt
+de_exprdata=$(workdir)/de.expr.dat
+
+
+# TODO doc
+N=$(shell awk '{print NF}' $(ebseqinfile) | sort -nu | tail -n 1)
+K=$(shell echo "$(N) + 1" | bc)
+
+
+usage:
+			@- echo "$$PROG_USAGE"
+
+help:			usage
+			
+
+all:			$(workdir) $(heatmap) $(prenorm) $(postnorm)
+			
+
+#infilecheck:		
+#			@- test -f $(ebseqinfile) || echo "Error: ebseqinfile not specified"
+#			@- test -f $(ebseqinfile)
+#			@- test -f $(ebseqoutfile) || echo "Error: ebseqoutfile not specified"
+#			@- test -f $(ebseqoutfile)
+
+$(workdir):		
+			test -d $(workdir) || mkdir $(workdir)
+
+$(de_molids):		$(ebseqoutfile)
+			tail -n +2 $(ebseqoutfile) | cut -f 1 | tr -d '"' | sort | uniq > $(workdir)/diffexp.molids.txt
+
+$(de_exprdata):		$(ebseqinfile) $(ebseqoutfile) $(de_molids)
+			$(BINDIR)/selex $(de_molids) <(tail -n +2 $(ebseqinfile) | tr -d '"') > $(de_exprdata).unsorted
+			$(BINDIR)/addfc $(de_exprdata).unsorted $(ebseqoutfile) | sort -n -k$(K),$(K) | cut -f 1-$(N) > $(de_exprdata).sorted
+			cat <(head -n 1 $(ebseqinfile)) $(de_exprdata).sorted > $(de_exprdata)
+
+$(heatmap):		$(de_exprdata) $(ebseqinfile)
+			$(BINDIR)/heatmaker --columns --heatmap=$(heatmap) --norm=$(ebseqinfile) $(samplearg) < $(de_exprdata)
+
+$(postnorm):		$(ebseqinfile)
+			$(BINDIR)/norm-check --before=$(prenorm) --after=$(postnorm) < $(ebseqinfile)
+
+$(prenorm):		$(postnorm)
+			

@@ -23,6 +23,7 @@ use Getopt::Long;
 # often need to use a list of values stored in one file to retrieve data from
 # another file. Loading the data into an SQL database isn't an appealing option
 # most of the time, so this script is my attempt at solving the general problem.
+# ------------------------------------------------------------------------------
 
 sub print_usage
 {
