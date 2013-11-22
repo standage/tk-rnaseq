@@ -1,28 +1,46 @@
 #!/usr/bin/env perl
 use strict;
 
-my $usage = "perl $0 expr-data.txt ebseq-results.txt";
-my $exprdatafile = shift(@ARGV) or die("Usage: $usage");
-my $ebseqfile = shift(@ARGV) or die("Usage: $usage");
+# Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+my $usage = "
+addfc: given an EBSeq input file (expression matrix) and an EBSeq output file,
+       print the EBSeq input file with an added column for fold change
+
+Usage: addfc ebseq.input.txt ebseq.output.txt\n\n";
+my $ebseqinfile = shift(@ARGV) or die($usage);
+my $ebseqoutfile = shift(@ARGV) or die($usage);
 
 my %fc;
-open(my $EBSEQ, "<", $ebseqfile) or die("ebseq file fail");
-<$EBSEQ>;
-while(<$EBSEQ>)
+open(my $EBSEQOUT, "<", $ebseqoutfile) or die("error opening $ebseqoutfile");
+<$EBSEQOUT>;
+while(<$EBSEQOUT>)
 {
   chomp;
   s/"//g;
   my($molid, $ppee, $ppde, $postfc, $realfc) = split(/\t/);
   $fc{$molid} = $postfc;
 }
-close($EBSEQ);
+close($EBSEQOUT);
 
-open(my $EXPR, "<", $exprdatafile) or die("expr data file fail");
-my $firstline = <$EXPR>;
+open(my $EBSEQIN, "<", $ebseqinfile) or die("error opening $ebseqinfile");
+my $firstline = <$EBSEQIN>;
 chomp($firstline);
 $firstline .= "\t\"FC\"\n";
 print $firstline;
-while(<$EXPR>)
+while(<$EBSEQIN>)
 {
   chomp;
   s/"//g;
@@ -30,3 +48,5 @@ while(<$EXPR>)
   $_ .= "\t". $fc{$molid} ."\n";
   print;
 }
+close($EBSEQIN)
+
