@@ -63,6 +63,8 @@ Usage: norm-check [options] < expr-matrix.txt
                          normalization to this PNG file; default is
                          'pre-norm.png'
     -h|--help:           print this help message and exit
+    -o|--out: FILE       print normalized data to this file; default is not to
+                         print normalized values
     -r|--res: INT        resolution (dpi) of generated graphics; default is 150
     -t|--height: INT     height (pixels) of generated graphics; default is 1200
     -w|--width: INT      width (pixels) of generated graphics; default is 1200
@@ -127,3 +129,8 @@ for(i in 2:nsamp)
   lines(h$mids, h$density, col=rainbow(nsamp)[i])
 }
 devnum <- dev.off()
+
+if(!is.null(opt$out))
+{
+  write.table(data.norm, file=opt$out, sep="\t")
+}
