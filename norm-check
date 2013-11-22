@@ -1,0 +1,114 @@
+#!/usr/bin/env Rscript
+
+# Copyright (c) 2013 Daniel S. Standage, released under MIT license
+#
+# norm-check: plot distributions of expression values before and after
+#             normalization; visually confirm that normalization worked
+#             as expected
+#
+# Program input is a matrix of expression values, each row corresponding to a
+# molecule (gene, transcript, etc) and each row corresponding to that molecule's
+# expression level or abundance. The program expects the rows and columns to be
+# named, and was tested primarily on output produced by the
+# 'rsem-generate-data-matrix' script distributed with the RSEM package. However,
+# the format described here is pretty common for R/Bioconductor-based
+# differential expression analysis packages.
+#
+# This program plots the distributions of the logged expression values by sample
+# as provided, then normalizes the values and plots the distribution of the
+# logged normalized expression values by sample. The expectation is that all
+# samples' distributions will have a similar shape but different medians prior
+# to normalization, and that post normalization they will all have an identical
+# median to facilitate cross-sample comparison.
+
+
+# MedianNorm function borrowed from the EBSeq library version 1.1.6
+# See http://www.bioconductor.org/packages/devel/bioc/html/EBSeq.html
+MedianNorm <- function(data)
+{
+  geomeans <- exp( rowMeans(log(data)) )
+  apply(data, 2, function(cnts) median((cnts/geomeans)[geomeans > 0]))
+}
+
+library("getopt")
+print_usage <- function(file=stderr())
+{
+  cat("
+norm-check: plot distributions of expression values before and after
+            normalization; visually confirm that normalization worked
+            as expected; see source code for a full description of
+            expected input format
+
+Usage: norm-check [options] < expr-matrix.txt
+  Options:
+    -a|--after: FILE     plot distributions of expression values post-
+                         normalization to this PNG file; default is
+                         'post-norm.png'
+    -b|--before: FILE    plot distributions of expression values pre-
+                         normalization to this PNG file; default is
+                         'pre-norm.png'
+    -h|--help:           print this help message and exit
+    -r|--res: INT        resolution (dpi) of generated graphics; default is 150
+    -t|--height: INT     height (pixels) of generated graphics; default is 1200
+    -w|--width: INT      width (pixels) of generated graphics; default is 1200
+    -y|--ylim: REAL      the visible range of the Y axis depends on the first
+                         smaple distribution plotted; if other distributions are
+                         getting cut off, use this setting to override the
+                         default\n\n")
+}
+
+spec <- matrix( c("after",  'a', 1, "character",
+                  "before", 'b', 1, "character",
+                  "help",   'h', 0, "logical",
+                  "out",    'o', 1, "character",
+                  "res",    'r', 1, "integer",
+                  "height", 't', 1, "integer",
+                  "width",  'w', 1, "integer",
+                  "ylim",   'y', 1, "double"),
+                byrow=TRUE, ncol=4)
+opt  <- getopt(spec)
+if(!is.null(opt$help))
+{
+  print_usage(file=stdout())
+  q(status=1)
+}
+if(is.null(opt$after))  { opt$after  <- "post-norm.png" }
+if(is.null(opt$before)) { opt$before <- "pre-norm.png"  }
+if(is.null(opt$height)) { opt$height <- 1200            }
+if(is.null(opt$res))    { opt$res    <- 150             }
+if(is.null(opt$width))  { opt$width  <- 1200            }
+if(!is.null(opt$ylim))  { opt$ylim   <- c(0, opt$ylim)  }
+
+# Load data, determine number of samples
+data  <- read.table(file("stdin"), header=TRUE, sep="\t", quote="")
+nsamp <- dim(data)[2] - 1
+data  <- data[,1:nsamp+1]
+
+# Plot distribution of expression values before normalization
+png(opt$before, height=opt$height, width=opt$width, res=opt$res)
+h <- hist(log(data[,1]), plot=FALSE)
+plot(h$mids, h$density, type="l", col=rainbow(nsamp)[1], main="",
+     xlab="Log expression value", ylab="Proportion of molecules", ylim=opt$ylim)
+for(i in 2:nsamp)
+{
+  h <- hist(log(data[,i]), plot=FALSE)
+  lines(h$mids, h$density, col=rainbow(nsamp)[i])
+}
+devnum <- dev.off()
+
+# Normalize by median
+size.factors <- MedianNorm(data.matrix(data))
+data.norm <- t(apply(data, 1, function(x){ x / size.factors }))
+
+# Plot distribution of normalized expression values
+png(opt$after, height=opt$height, width=opt$width, res=opt$res)
+h <- hist(log(data.norm[,1]), plot=FALSE)
+plot(h$mids, h$density, type="l", col=rainbow(nsamp)[1], main="",
+     xlab="Log normalized expression value", ylab="Proportion of molecules",
+     ylim=opt$ylim)
+for(i in 2:nsamp)
+{
+  h <- hist(log(data.norm[,i]), plot=FALSE)
+  lines(h$mids, h$density, col=rainbow(nsamp)[i])
+}
+devnum <- dev.off()
