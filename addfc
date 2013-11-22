@@ -1,0 +1,32 @@
+#!/usr/bin/env perl
+use strict;
+
+my $usage = "perl $0 expr-data.txt ebseq-results.txt";
+my $exprdatafile = shift(@ARGV) or die("Usage: $usage");
+my $ebseqfile = shift(@ARGV) or die("Usage: $usage");
+
+my %fc;
+open(my $EBSEQ, "<", $ebseqfile) or die("ebseq file fail");
+<$EBSEQ>;
+while(<$EBSEQ>)
+{
+  chomp;
+  s/"//g;
+  my($molid, $ppee, $ppde, $postfc, $realfc) = split(/\t/);
+  $fc{$molid} = $postfc;
+}
+close($EBSEQ);
+
+open(my $EXPR, "<", $exprdatafile) or die("expr data file fail");
+my $firstline = <$EXPR>;
+chomp($firstline);
+$firstline .= "\t\"FC\"\n";
+print $firstline;
+while(<$EXPR>)
+{
+  chomp;
+  s/"//g;
+  my($molid, @values) = split(/\t/);
+  $_ .= "\t". $fc{$molid} ."\n";
+  print;
+}

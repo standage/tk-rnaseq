@@ -1,77 +1,32 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env make -f
+SHELL := /usr/bin/env bash
 
-# Copyright (c) 2013 Daniel S. Standage, released under MIT license
-#
-# heatmaker: generate a heatmap; intended use is for gene expression data, but
-#            easily adaptable for any data stored in a tab-delimited table or
-#            matrix format
-#
-# TODO fully document program input, output, etc
+# Program options
+BINDIR=.
+WORKDIR=$(BINDIR)
+RSEMFILE=$(WORKDIR)/expr.rsem.dat
+EBSEQFILE=$(WORKDIR)/diffexp.ebseq.dat
+PNG=$(WORKDIR)/heatmap.png
+ifdef SAMPLES
+  SAMPLEARG= --samples=$(SAMPLES)
+endif
+
+all:						$(WORKDIR) $(PNG)
+
+$(WORKDIR):					
+						test -d $(WORKDIR) || mkdir $(WORKDIR)
+
+$(WORKDIR)/diffexp.molids.txt:			$(EBSEQFILE)
+						tail -n +2 $(EBSEQFILE) | cut -f 1 | tr -d '"' | sort | uniq > $(WORKDIR)/diffexp.molids.txt
+
+$(WORKDIR)/expr.diffexp.rsem.dat:		$(RSEMFILE) $(WORKDIR)/diffexp.molids.txt
+						$(BINDIR)/selex $(WORKDIR)/diffexp.molids.txt <(tail -n +2 $(RSEMFILE) | tr -d '"') > $(WORKDIR)/expr.diffexp.rsem.dat.temp
+						cat <(head -n 1 $(RSEMFILE)) $(WORKDIR)/expr.diffexp.rsem.dat.temp > $(WORKDIR)/expr.diffexp.rsem.dat
+						rm $(WORKDIR)/expr.diffexp.rsem.dat.temp
+
+$(WORKDIR)/expr.diffexp.rsem.dat.withFC:	$(EBSEQFILE) $(WORKDIR)/expr.diffexp.rsem.dat
+						$(BINDIR)/addfc $(WORKDIR)/expr.diffexp.rsem.dat $(EBSEQFILE) > $(WORKDIR)/expr.diffexp.rsem.dat.withFC
 
 
-# MedianNorm borrowed from the EBSeq library version 1.1.6
-# See http://www.bioconductor.org/packages/devel/bioc/html/EBSeq.html
-MedianNorm <- function(data)
-{
-  geomeans <- exp( rowMeans(log(data)) )
-  apply(data, 2, function(cnts) median((cnts/geomeans)[geomeans > 0]))
-}
-
-library("getopt")
-
-print_usage <- function(file=stderr())
-{
-  cat("
-heatmaker: see source code for full description
-Usage: heatmaker [options] < data-matrix.txt
-  Options:
-    -c|--columns:         cluster columns and plot the corresponding dendrogram
-                          on the axis
-    -h|--help:            print this message and exit
-    -n|--norm: FILE       data matrix to be used for computing library size
-                          factors using normalization by median; default is no
-                          normalization
-    -o|--outfile: FILE    file to which output will be printed (in PNG format);
-                          default is 'heatmap.png'
-    -r|--rows:            cluster rows and plot the corresponding dendrogram on
-                          the axis\n",
-    file=file)
-}
-
-# Parse command line options/arguments
-spec <- matrix( c( "columns", 'c', 0, "logical",
-                   "help",    'h', 0, "logical",
-                   "norm",    'n', 1, "character",
-                   "outfile", 'o', 1, "character",
-                   "rows",    'r', 0, "logical"),
-                byrow=TRUE, ncol=4)
-opt <- getopt(spec)
-if(!is.null(opt$help))
-{
-  print_usage(file=stdout());
-  q(save="no", status=0);
-}
-if( is.null(opt$outfile) ) { opt$outfile <- "heatmap.png" }
-if( is.null(opt$columns) ) { opt$column  <- NA } else { opt$column <- NULL }
-if( is.null(opt$rows) )    { opt$rows    <- NA } else { opt$rows   <- NULL }
-
-data <- read.table(file("stdin"), header=TRUE, sep="\t")
-row.names(data) <- data[,1]
-dimensions <- dim(data)
-data <- data[,2:dimensions[2]]
-
-# Normalize expression data by MedianNorm
-if(!is.null(opt$norm))
-{
-  norm.data <- data.matrix(read.table(opt$norm))
-  factors <- MedianNorm(norm.data)
-  data <- t(apply(data, 1, function(x){return(x/factors)}))
-  cat(c("Data matrix adjusted using following size factors: ",
-        as.vector(factors)),
-      file=stderr(), sep="\n")
-}
-
-# Generate heatmap
-png(opt$outfile, width=1200, height=1200, res=150)
-heatmap(data.matrix(data), Rowv=opt$rows, Colv=opt$cols)
-devnum <- dev.off()
+$(PNG):						$(WORKDIR)/expr.diffexp.rsem.dat.withFC $(RSEMFILE)
+						$(BINDIR)/de-viz $(SAMPLEARG) --before=$(WORKDIR)/before.norm.png --after=$(WORKDIR)/after.norm.png --norm=$(RSEMFILE) --heatmap=$(PNG) --columns < $(WORKDIR)/expr.diffexp.rsem.dat.withFC
