@@ -1,32 +1,100 @@
-#!/usr/bin/env make -f
-SHELL := /usr/bin/env bash
+#!/usr/bin/env Rscript
 
-# Program options
-BINDIR=.
-WORKDIR=$(BINDIR)
-RSEMFILE=$(WORKDIR)/expr.rsem.dat
-EBSEQFILE=$(WORKDIR)/diffexp.ebseq.dat
-PNG=$(WORKDIR)/heatmap.png
-ifdef SAMPLES
-  SAMPLEARG= --samples=$(SAMPLES)
-endif
+# Copyright (c) 2013 Daniel S. Standage, released under MIT license
+#
+# heatmaker: generate a heatmap to visualize gene expression data
+#
+# Program input is a matrix of expression values, each row corresponding to a
+# molecule (gene, transcript, etc) and each row corresponding to that molecule's
+# expression level or abundance. The program expects the rows and columns to be
+# named, and was tested primarily on output produced by the
+# 'rsem-generate-data-matrix' script distributed with the RSEM package. However,
+# the format described here is pretty common for R/Bioconductor-based
+# differential expression analysis packages.
 
-all:						$(WORKDIR) $(PNG)
+# By default, the program plots the heatmap without making any changes to the
+# row and column order of the input. However, clustering rows and/or columns and
+# plotting the corresponding dendrogram on the axis is an option. I typically
+# sort rows by fold change before running this script, and then allow the
+# program to cluster the columns (samples) and plot the dendrogram.
 
-$(WORKDIR):					
-						test -d $(WORKDIR) || mkdir $(WORKDIR)
+# MedianNorm borrowed from the EBSeq library version 1.1.6
+# See http://www.bioconductor.org/packages/devel/bioc/html/EBSeq.html
+MedianNorm <- function(data)
+{
+  geomeans <- exp( rowMeans(log(data)) )
+  apply(data, 2, function(cnts) median((cnts/geomeans)[geomeans > 0]))
+}
 
-$(WORKDIR)/diffexp.molids.txt:			$(EBSEQFILE)
-						tail -n +2 $(EBSEQFILE) | cut -f 1 | tr -d '"' | sort | uniq > $(WORKDIR)/diffexp.molids.txt
+library("getopt")
 
-$(WORKDIR)/expr.diffexp.rsem.dat:		$(RSEMFILE) $(WORKDIR)/diffexp.molids.txt
-						$(BINDIR)/selex $(WORKDIR)/diffexp.molids.txt <(tail -n +2 $(RSEMFILE) | tr -d '"') > $(WORKDIR)/expr.diffexp.rsem.dat.temp
-						cat <(head -n 1 $(RSEMFILE)) $(WORKDIR)/expr.diffexp.rsem.dat.temp > $(WORKDIR)/expr.diffexp.rsem.dat
-						rm $(WORKDIR)/expr.diffexp.rsem.dat.temp
+print_usage <- function(file=stderr())
+{
+  cat("
+heatmaker: generate a heatmap to visualize gene expression data; see the source
+           code for a full description of the program inputs and outputs
 
-$(WORKDIR)/expr.diffexp.rsem.dat.withFC:	$(EBSEQFILE) $(WORKDIR)/expr.diffexp.rsem.dat
-						$(BINDIR)/addfc $(WORKDIR)/expr.diffexp.rsem.dat $(EBSEQFILE) > $(WORKDIR)/expr.diffexp.rsem.dat.withFC
+Usage: heatmaker [options] < data-matrix.txt
+  Options:
+    -c|--columns:          cluster columns and plot the corresponding dendrogram
+                           on the axis; default is to maintain input order
+    -h|--help:             print this message and exit
+    -l|--colors: STR,STR   specify the colors to use when plotting expression
+                           values; default is 'yellow,blue' as this combination
+                           is color-blindness-friendly
+    -m|--heatmap: FILE     plot heatmap of expression values to the given file;
+                           default is 'heatmap.png'
+    -n|--norm: FILE        data matrix to be used for computing library size
+                           factors using normalization by median; default is no
+                           normalization
+    -r|--rows:             cluster rows and plot the corresponding dendrogram on
+                           the axis; default is to sort by fold change and plot
+                           no dendrogram
+    -s|--samples: STR      a comma-separated list of sample labels to replace
+                           those in the data matrix file\n\n",
+    file=file)
+}
 
+spec <- matrix( c("columns", 'c', 0, "logical",
+                  "help",    'h', 0, "logical",
+                  "heatmap", 'm', 1, "character",
+                  "colors",  'l', 1, "character",
+                  "norm",    'n', 1, "character",
+                  "rows",    'r', 0, "logical",
+                  "samples", 's', 1, "character"),
+                byrow=TRUE, ncol=4)
 
-$(PNG):						$(WORKDIR)/expr.diffexp.rsem.dat.withFC $(RSEMFILE)
-						$(BINDIR)/de-viz $(SAMPLEARG) --before=$(WORKDIR)/before.norm.png --after=$(WORKDIR)/after.norm.png --norm=$(RSEMFILE) --heatmap=$(PNG) --columns < $(WORKDIR)/expr.diffexp.rsem.dat.withFC
+opt <- getopt(spec)
+if(!is.null(opt$help))
+{
+  print_usage(file=stdout());
+  q(save="no", status=0);
+}
+
+if( is.null(opt$columns) ) { opt$column  <- NA } else { opt$column <- NULL }
+if( is.null(opt$heatmap) ) { opt$heatmap <- "heatmap.png" }
+if( is.null(opt$colors) )  { opt$colors  <- "yellow,blue" }
+if( is.null(opt$rows) )    { opt$rows    <- NA } else { opt$rows   <- NULL }
+
+data <- read.table(file="stdin", header=TRUE, sep="\t")
+row.names(data) <- data[,1]
+dimensions <- dim(data)
+data <- data[,2:dimensions[2]]
+nsamples <- dim(data)[2]
+
+if(!is.null(opt$samples))
+{
+  colnames(data) <- unlist(strsplit(opt$samples, ","))
+}
+
+if(!is.null(opt$norm))
+{
+  norm.data <- data.matrix(read.table(opt$norm))
+  factors <- MedianNorm(norm.data)
+  data <- t(apply(data, 1, function(x){return(x/factors)}))
+}
+
+hm.col <- unlist(strsplit(opt$colors, ","))
+png(opt$heatmap, width=1200, height=1200, res=150)
+heatmap(data.matrix(data), col=colorRampPalette(hm.col)(64), labRow=NA, Rowv=NA)
+devnum <- dev.off()

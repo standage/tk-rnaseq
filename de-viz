@@ -1,120 +1,32 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env make -f
+SHELL := /usr/bin/env bash
 
-# Copyright (c) 2013 Daniel S. Standage, released under MIT license
-#
-# de-viz: visualize expression data with plots and heatmaps
-#
-# TODO fully document program input, output, etc
+# Program options
+BINDIR=.
+WORKDIR=$(BINDIR)
+RSEMFILE=$(WORKDIR)/expr.rsem.dat
+EBSEQFILE=$(WORKDIR)/diffexp.ebseq.dat
+PNG=$(WORKDIR)/heatmap.png
+ifdef SAMPLES
+  SAMPLEARG= --samples=$(SAMPLES)
+endif
 
-# MedianNorm borrowed from the EBSeq library version 1.1.6
-# See http://www.bioconductor.org/packages/devel/bioc/html/EBSeq.html
-MedianNorm <- function(data)
-{
-  geomeans <- exp( rowMeans(log(data)) )
-  apply(data, 2, function(cnts) median((cnts/geomeans)[geomeans > 0]))
-}
+all:						$(WORKDIR) $(PNG)
 
-library("getopt")
+$(WORKDIR):					
+						test -d $(WORKDIR) || mkdir $(WORKDIR)
 
-print_usage <- function(file=stderr())
-{
-  cat("
-de-viz: visualizations for differential expression analysis; see source code
-        for a full description
+$(WORKDIR)/diffexp.molids.txt:			$(EBSEQFILE)
+						tail -n +2 $(EBSEQFILE) | cut -f 1 | tr -d '"' | sort | uniq > $(WORKDIR)/diffexp.molids.txt
 
-Usage: de-viz [options] < data-matrix.txt
-  General options:
-    -h|--help:            print this message and exit
-    -s|--samples: STR     a comma-separated list of sample labels to replace
-                          those in the data matrix file
+$(WORKDIR)/expr.diffexp.rsem.dat:		$(RSEMFILE) $(WORKDIR)/diffexp.molids.txt
+						$(BINDIR)/selex $(WORKDIR)/diffexp.molids.txt <(tail -n +2 $(RSEMFILE) | tr -d '"') > $(WORKDIR)/expr.diffexp.rsem.dat.temp
+						cat <(head -n 1 $(RSEMFILE)) $(WORKDIR)/expr.diffexp.rsem.dat.temp > $(WORKDIR)/expr.diffexp.rsem.dat
+						rm $(WORKDIR)/expr.diffexp.rsem.dat.temp
 
-  Normalization options:
-    -a|--after: FILE      plot expression value distribution post-normalization
-                          to the given file
-    -b|--before: FILE     plot expression value distribution pre-normalization
-                          to the given file
-    -n|--norm: FILE       data matrix to be used for computing library size
-                          factors using normalization by median; default is no
-                          normalization
+$(WORKDIR)/expr.diffexp.rsem.dat.withFC:	$(EBSEQFILE) $(WORKDIR)/expr.diffexp.rsem.dat
+						$(BINDIR)/addfc $(WORKDIR)/expr.diffexp.rsem.dat $(EBSEQFILE) > $(WORKDIR)/expr.diffexp.rsem.dat.withFC
 
-  Heatmap options:
-    -c|--columns:         cluster columns and plot the corresponding dendrogram
-                          on the axis; default is to maintain input order
-    -m|--heatmap: FILE    plot heatmap of expression values to the given file;
-                          default is 'heatmap.png'
-    -r|--rows:            cluster rows and plot the corresponding dendrogram on
-                          the axis; default is to sort by fold change and plot
-                          no dendrogram\n\n",
-    file=file)
-}
 
-spec <- matrix( c( "after",   'a', 1, "character",
-                   "before",  'b', 1, "character",
-                   "columns", 'c', 0, "logical",
-                   "help",    'h', 0, "logical",
-                   "heatmap", 'm', 1, "character",
-                   "norm",    'n', 1, "character",
-                   "rows",    'r', 0, "logical",
-                   "samples", 's', 1, "character"),
-                byrow=TRUE, ncol=4)
-
-opt <- getopt(spec)
-if(!is.null(opt$help))
-{
-  print_usage(file=stdout());
-  q(save="no", status=0);
-}
-
-if( is.null(opt$columns) ) { opt$column  <- NA } else { opt$column <- NULL }
-if( is.null(opt$rows) )    { opt$rows    <- NA } else { opt$rows   <- NULL }
-
-data <- read.table(file="stdin", header=TRUE, sep="\t")
-data <- data[order(data$FC),]
-row.names(data) <- data[,1]
-dimensions <- dim(data)
-data <- data[,3:dimensions[2]-1]
-nsamples <- dim(data)[2]
-if(!is.null(opt$samples))
-{
-  colnames(data) <- unlist(strsplit(opt$samples, ","))
-}
-
-if(!is.null(opt$norm))
-{
-  if(!is.null(opt$before))
-  {
-    png(opt$before, height=1200, width=1200, res=150)
-    h <- hist(log(data[,1]), plot=FALSE)
-    plot(h$mids, h$density, type="l", col=rainbow(nsamples)[1], main="", xlab="Log expression value", ylab="Proportion of molecules")
-    for(i in 1:nsamples)
-    {
-      h <- hist(log(data[,i]), plot=FALSE)
-      lines(h$mids, h$density, col=rainbow(nsamples)[i])
-    }
-  }
-  devnum <- dev.off()
-
-  norm.data <- data.matrix(read.table(opt$norm))
-  factors <- MedianNorm(norm.data)
-  data <- t(apply(data, 1, function(x){return(x/factors)}))
-
-  if(!is.null(opt$after))
-  {
-    png(opt$after, height=1200, width=1200, res=150)
-    h <- hist(log(data[,1]), plot=FALSE)
-    plot(h$mids, h$density, type="l", col=rainbow(nsamples)[1], main="", xlab="Log normalized expression value", ylab="Proportion of molecules")
-    for(i in 1:nsamples)
-    {
-      h <- hist(log(data[,i]), plot=FALSE)
-      lines(h$mids, h$density, col=rainbow(nsamples)[i])
-    }
-  }
-}
-
-if(!is.null(opt$heatmap))
-{
-  png(opt$heatmap, width=1200, height=1200, res=150)
-  heatmap(data.matrix(data), col=colorRampPalette(c("yellow", "blue"))(64), labRow=NA, Rowv=NA)
-  devnum <- dev.off()
-}
-
+$(PNG):						$(WORKDIR)/expr.diffexp.rsem.dat.withFC $(RSEMFILE)
+						$(BINDIR)/de-viz $(SAMPLEARG) --before=$(WORKDIR)/before.norm.png --after=$(WORKDIR)/after.norm.png --norm=$(RSEMFILE) --heatmap=$(PNG) --columns < $(WORKDIR)/expr.diffexp.rsem.dat.withFC
