@@ -37,6 +37,8 @@ de-viz: visualizations for differential expression analysis; see source code for
 
 Usage: de-vis [options] ebseqin=rsem.output.txt ebseqout=ebseq.output.txt all
   Options:
+    colors=COL,COL    a comma-separated pair of colors to use for heatmap;
+                      default is colorblind-friendly 'yellow,blue'
     heatmap=FILE      plot heatmap of expression values to the given PNG file;
                       default is '$$workdir/heatmap.png'
     help              print this help message and exit
@@ -61,6 +63,7 @@ ifndef ebseqoutfile
   $(error ebseqoutfile is not specified $(PROG_USAGE))
 endif
 workdir=.
+colors=yellow,blue
 heatmap=$(workdir)/heatmap.png
 postnorm=$(workdir)/post-norm.png
 prenorm=$(workdir)/pre-norm.png
@@ -101,7 +104,7 @@ $(de_exprdata):		$(ebseqinfile) $(ebseqoutfile) $(de_molids)
 			cat <(head -n 1 $(ebseqinfile)) $(de_exprdata).sorted > $(de_exprdata)
 
 $(heatmap):		$(de_exprdata) $(ebseqinfile)
-			$(BINDIR)/heatmaker --columns --heatmap=$(heatmap) --norm=$(ebseqinfile) $(samplearg) < $(de_exprdata)
+			$(BINDIR)/heatmaker --colors='$(colors)' --columns --heatmap=$(heatmap) --norm=$(ebseqinfile) $(samplearg) < $(de_exprdata)
 
 $(postnorm):		$(ebseqinfile)
 			$(BINDIR)/norm-check --before=$(prenorm) --after=$(postnorm) < $(ebseqinfile)
