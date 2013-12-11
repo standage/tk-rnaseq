@@ -1,0 +1,109 @@
+#!/usr/bin/env perl
+use strict;
+use Getopt::Long;
+
+# Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# ------------------------------------------------------------------------------
+# demat2arff: convert an expression matrix to ARFF (Weka) format
+#
+# While interpreting the results of a basic two-condition differential
+# expression analysis, it is tempting to look at genes or transcripts by fold
+# change. While of course this is informative, these molecules are not
+# necessarily the most diagnostic between the two conditions. One approach to
+# identifying the most diagnostic molecule set involves class prediction with
+# leave-one-out cross-validation. The Weka package is an excellent environment
+# in which to do this type of analysis, but has a unique input format. This
+# script is designed to take data in a format commonly used for differential
+# gene expression analysis packages (a matrix where columns are samples and
+# rows are genes/transcripts) and convert it into Weka's ARFF format.
+# ------------------------------------------------------------------------------
+
+sub print_usage
+{
+  my $outstream = shift(@_);
+  print $outstream "
+demat2arff: convert an expression matrix to ARFF (Weka) format
+
+Usage: demat2arff [options] < demat.dat > de.arff
+  Options:
+    -c|--cond: STRING,STRING    the two conditions compared in the contrast;
+                                default is 'c1,c2'
+    -h|--help                   print this help message and exit
+    -n|--numsamp: INT,INT       the number of samples in condition 1 and
+                                condition 2, respectively; if there are n
+                                samples in condition 1, then these n samples are
+                                expected to be in the first n columns of the
+                                expression matrix; default is '1,1'
+    -r|--rel: STRING            a name or label for this relation; default is
+                                'contrast'
+";
+}
+
+# Parse options from command line
+my $condstr = "c1,c2";
+my $numsampstr = "1,1";
+my $relation = "contrast";
+GetOptions
+(
+  "c|cond=s"    => \$condstr,
+  "h|help"      => sub{ print_usage(*STDOUT); exit(0) },
+  "n|numsamp=s" => \$numsampstr,
+  "r|rel=s"     => \$relation,
+);
+my($c1label, $c2label) = split(/,/, $condstr);
+my($c1samp,  $c2samp)  = split(/,/, $numsampstr);
+
+# Grab sample labels off the first line
+my $firstline = <STDIN>;
+chomp($firstline);
+$firstline =~ s/"//g;
+my($firstfield, @samplelabels) = split(/\t/, $firstline);
+my $numsamples = scalar(@samplelabels);
+if($c1samp + $c2samp != $numsamples)
+{
+  printf(STDERR "%d samples expected for condition 1 (%s) and %d samples ".
+         "expected for condition 2 (%s), but found %d samples overall; this ".
+         "doesn't add up!\n", $c1samp,$c1label, $c2samp,$c2label, $numsamples);
+  print_usage(\*STDERR);
+  exit(1);
+}
+
+print("\@RELATION $relation\n\n");
+
+my @expression;
+
+while(my $line = <STDIN>)
+{
+  chomp($line);
+  my($molid, @expr) = split(/\t/, $line);
+  $molid =~ s/"//g;
+  printf("\@ATTRIBUTE %-35s NUMERIC\n", $molid);
+
+  push(@expression, \@expr);
+}
+
+printf("\@ATTRIBUTE %-35s {$c1label, $c2label}\n\n\@DATA\n", "caste");
+my $nummols = scalar(@expression);
+for(my $i = 0; $i < $numsamples; $i++)
+{
+  for(my $j = 0; $j < $nummols; $j++)
+  {
+    print(",") unless($j == 0);
+    printf("%.4lf", $expression[$j]->[$i]);
+  }
+  my $class = ($i < $c1samp) ? $c1label : $c2label;
+  print(",$class\n");
+}

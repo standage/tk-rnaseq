@@ -31,7 +31,6 @@ sub print_usage
   print $outstream "
 selex: pull out needles from your tabular haystack!
 
-# ------------------------------------------------------------------------------
   Input:  a 'needles' file and a 'haystack' file. The 'haystack' file contains
           data in tabular format. The 'needles' file contains a list of values
           used to select data from the haystack. These values may be listed one
