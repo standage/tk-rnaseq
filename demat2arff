@@ -49,6 +49,9 @@ Usage: demat2arff [options] < demat.dat > de.arff
                                 expression matrix; default is '1,1'
     -r|--rel: STRING            a name or label for this relation; default is
                                 'contrast'
+    -s|--subset: FILE           file containing a list of molecule IDs;
+                                expression values for all other molecule IDs
+                                will be ignored; default is to use all data
 ";
 }
 
@@ -56,15 +59,29 @@ Usage: demat2arff [options] < demat.dat > de.arff
 my $condstr = "c1,c2";
 my $numsampstr = "1,1";
 my $relation = "contrast";
+my $subset = "";
 GetOptions
 (
   "c|cond=s"    => \$condstr,
   "h|help"      => sub{ print_usage(*STDOUT); exit(0) },
   "n|numsamp=s" => \$numsampstr,
   "r|rel=s"     => \$relation,
+  "s|subset=s"  => \$subset,
 );
 my($c1label, $c2label) = split(/,/, $condstr);
 my($c1samp,  $c2samp)  = split(/,/, $numsampstr);
+
+my %molids2keep;
+unless($subset eq "")
+{
+  open(my $SUB, "<", $subset) or die("error opening subset file $subset");
+  while(<$SUB>)
+  {
+    chomp;
+    $molids2keep{$_} = 1;
+  }
+  close($SUB);
+}
 
 # Grab sample labels off the first line
 my $firstline = <STDIN>;
@@ -90,8 +107,9 @@ while(my $line = <STDIN>)
   chomp($line);
   my($molid, @expr) = split(/\t/, $line);
   $molid =~ s/"//g;
-  printf("\@ATTRIBUTE %-35s NUMERIC\n", $molid);
+  next unless($subset eq "" or $molids2keep{$molid});
 
+  printf("\@ATTRIBUTE %-35s NUMERIC\n", $molid);
   push(@expression, \@expr);
 }
 
