@@ -49,7 +49,7 @@ Usage: de-vis [options] ebseqin=rsem.output.txt ebseqout=ebseq.output.txt all
     samples=STRING    override sample labels from the input data files with a
                       comma-separated list of new labels
     workdir=DIR       directory in which to place temporary files and, by
-                      default, the output files
+                      default, the output files; default is current directory
 
 endef
 export PROG_USAGE

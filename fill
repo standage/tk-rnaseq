@@ -1,0 +1,65 @@
+#!/usr/bin/env perl
+use strict;
+
+# Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# ------------------------------------------------------------------------------
+# fill: fill in missing values in a table
+#
+# When cutting and pasting tabular data using the UNIX 'cut' and 'paste'
+# commands, lining data up correctly requires that 1) the various tables being
+# combined are sorted, 2) the tables have the same number of rows, and 3) that
+# row i in one table corresponds to row i in another table. If one or more of
+# the tables have partial data, the missing data needs to be filled in to ensure
+# rows line up correctly. This script was written to facilitate this task.
+# ------------------------------------------------------------------------------
+
+my $usage = "fill idlist.txt < indata.txt > outdata.txt";
+my $idlistfile = shift(@ARGV) or die("Usage: $usage");
+
+my %idlist;
+open(my $ID, "<", $idlistfile) or die("unable to open file '$idlistfile'");
+while(my $id = <$ID>)
+{
+  chomp($id);
+  $idlist{$id} = 1;
+}
+close($ID);
+
+my $numfields = 0;
+while(my $line = <STDIN>)
+{
+  my($id, @fields) = split(/\t/, $line);
+  delete($idlist{$id});
+  $numfields = scalar(@fields) if($numfields == 0);
+  if($numfields != scalar(@fields))
+  {
+    printf(STDERR "error: some rows have %d fields, while some have %d\n",
+           $numfields, scalar(@fields));
+    exit(1);
+  }
+}
+
+my @filler;
+while(scalar(@filler) < $numfields)
+{
+  push(@filler, "0");
+}
+my $fillstring = join("\t", @filler);
+
+foreach my $id(keys(%idlist))
+{
+  print("$id\t$fillstring\n");
+}

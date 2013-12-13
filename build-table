@@ -16,6 +16,7 @@
 
 
 # ------------------------------------------------------------------------------
+#
 # ------------------------------------------------------------------------------
 
 
@@ -24,26 +25,31 @@ MKFILE=$(CURDIR)/$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 BINDIR=$(shell dirname $(MKFILE))
 define PROG_USAGE
 
-build-table: asdf
+build-table: build a table of gene/transcript expression data including fold
+             changes, reads mapped, and expression values
 
-Usage: build-table [options] args
+Usage: build-table [options] ebseqin=rsem.output.txt ebseqout=ebseq.output.txt \
+                             samfilepattern=/path/to/data/my.species.*.sam all
   Options:
-
+    output         file to which output will be written; default is
+                   $(workdir)/expression-data.txt
+    workdir=DIR    director in which to place temporary files and, by default,
+                   the output file; default is current directory
 
 endef
 export PROG_USAGE
 
 
 # Program options
-#ifndef ebseqinfile
-#  $(error ebseqinfile is not specified $(PROG_USAGE))
-#endif
-#ifndef ebseqoutfile
-#  $(error ebseqoutfile is not specified $(PROG_USAGE))
-#endif
-#ifndef samfilepattern
-#  $(error samfilepattern is not specified $(PROG_USAGE))
-#endif
+ifndef ebseqinfile
+  $(error ebseqinfile is not specified $(PROG_USAGE))
+endif
+ifndef ebseqoutfile
+  $(error ebseqoutfile is not specified $(PROG_USAGE))
+endif
+ifndef samfilepattern
+  samfilepattern=*.sam
+endif
 workdir=.
 samfilelist=$(shell ls $(samfilepattern) | tr '\n' ' ')
 
@@ -53,6 +59,7 @@ foldchanges=$(workdir)/foldchanges.txt
 readsmapped=$(workdir)/readsmapped.txt
 output=$(workdir)/expression-data.txt
 exprdata=$(workdir)/exprdata.txt
+seqlist=$(workdir)/seqlist.txt
 
 
 usage:
@@ -64,19 +71,27 @@ help:			usage
 all:			$(output)
 			
 
+$(seqlist):		$(fasta)
+			perl -ne 'm/^>(\S+)/ and print "$$1\n"' < $(fasta) > $(seqlist)
+
 $(BINDIR)/smr:		$(BINDIR)/smr.cpp
 			g++ -Wall -O3 -std=c++11 -o $(BINDIR)/smr $(BINDIR)/smr.cpp
 
-$(foldchanges).temp:	$(ebseqoutfile)
-			$(BINDIR)/addmag < $(ebseqoutfile) > $(foldchanges)
+$(foldchanges):		$(ebseqoutfile) $(seqlist)
+			$(BINDIR)/addmag < $(ebseqoutfile) > $(foldchanges).temp
+			$(BINDIR)/fill $(seqlist) < $(foldchanges).temp | sort > $(foldchanges)
 
-$(readsmapped).temp:	$(samfilelist) $(BINDIR)/smr
-			$(BINDIR)/smr --delim='\t' --outfile=$(readsmapped) $(samfilelist)
+$(readsmapped):		$(samfilelist) $(BINDIR)/smr $(seqlist)
+			$(BINDIR)/smr --delim='\t' --outfile=$(readsmapped).temp $(samfilelist)
+			$(BINDIR)/fill $(seqlist) < $(readsmapped).temp | sort > $(readsmapped)
 
-$(exprdata):		$(ebseqinfile)
+
+$(exprdata):		$(ebseqinfile) $(seqlist)
 			$(BINDIR)/norm-check --before=$(workdir)/pre-norm.png --after=$(workdir)/post-norm.png --out=$(exprdata).norm.temp < $(ebseqinfile)
 			cat <(head -n 1 $(ebseqinfile) | perl -ne 'print "mol"; s/"([\t|\n])/.norm"$$1/g; print') <(tail -n +2 $(exprdata).norm.temp) > $(exprdata).norm
-			paste $(ebseqinfile) <(cut -f 2- $(exprdata).norm) > $(exprdata)
+			paste $(ebseqinfile) <(cut -f 2- $(exprdata).norm) > $(exprdata).temp
+			$(BINDIR)/fill $(seqlist) < $(exprdata).temp | sort > $(exprdata)
 
-
-
+$(output):		$(foldchanges) $(readsmapped) $(exprdata)
+			wc -l $(foldchanges) $(readsmapped) $(exprdata)
+			paste <(tail -n +2 $(foldchanges)) <(tail -n +2 $(readsmapped) | cut -f 2-) <(tail -n +2 $(exprdata) | cut -f 2-)
