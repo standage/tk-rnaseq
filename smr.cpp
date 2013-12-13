@@ -118,10 +118,10 @@ struct SmrOptions
 "each input file) showing the number of reads that map to each molecule.\n\n"
 "Usage: smr [options] sample-1.sam sample-2.sam ... sample-n.sam\n"
 "  Options:\n"
-"    -d|--delim: CHAR         delimiter for output data; default is comma\n"
-"    -h|--help                print this help message and exit\n"
-"    -o|--outfile: FILE       name of file to which read counts will be\n"
-"                             written; default is terminal (stdout)\n\n");
+"    -d CHAR      delimiter for output data; default is comma\n"
+"    -h           print this help message and exit\n"
+"    -o FILE      name of file to which read counts will be written; default\n"
+"                 is terminal (stdout)\n\n");
   }
 };
 

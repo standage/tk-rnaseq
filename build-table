@@ -1,4 +1,4 @@
-#!/usr/bin/env make -f
+#!/usr/bin/make -f
 
 # Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
 #
@@ -21,14 +21,15 @@
 
 
 SHELL := /usr/bin/env bash
-MKFILE=$(CURDIR)/$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
+MKFILE=$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 BINDIR=$(shell dirname $(MKFILE))
 define PROG_USAGE
 
 build-table: build a table of gene/transcript expression data including fold
              changes, reads mapped, and expression values
 
-Usage: build-table [options] ebseqin=rsem.output.txt ebseqout=ebseq.output.txt \
+Usage: build-table [options] ebseqinfile=rsem.output.txt   \\
+                             ebseqoutfile=ebseq.output.txt \\
                              samfilepattern=/path/to/data/my.species.*.sam all
   Options:
     output         file to which output will be written; default is
@@ -46,6 +47,9 @@ ifndef ebseqinfile
 endif
 ifndef ebseqoutfile
   $(error ebseqoutfile is not specified $(PROG_USAGE))
+endif
+ifndef fasta
+  $(error fasta is not specified $(PROG_USAGE))
 endif
 ifndef samfilepattern
   samfilepattern=*.sam
@@ -79,19 +83,18 @@ $(BINDIR)/smr:		$(BINDIR)/smr.cpp
 
 $(foldchanges):		$(ebseqoutfile) $(seqlist)
 			$(BINDIR)/addmag < $(ebseqoutfile) > $(foldchanges).temp
-			$(BINDIR)/fill $(seqlist) < $(foldchanges).temp | sort > $(foldchanges)
+			$(BINDIR)/fill $(seqlist) < <(tail -n +2 $(foldchanges).temp) | sort > $(foldchanges)
 
 $(readsmapped):		$(samfilelist) $(BINDIR)/smr $(seqlist)
-			$(BINDIR)/smr --delim='\t' --outfile=$(readsmapped).temp $(samfilelist)
-			$(BINDIR)/fill $(seqlist) < $(readsmapped).temp | sort > $(readsmapped)
+			$(BINDIR)/run-smr-par $(BINDIR) $(workdir) $(seqlist) $(readsmapped) $(samfilelist)
 
 
 $(exprdata):		$(ebseqinfile) $(seqlist)
 			$(BINDIR)/norm-check --before=$(workdir)/pre-norm.png --after=$(workdir)/post-norm.png --out=$(exprdata).norm.temp < $(ebseqinfile)
 			cat <(head -n 1 $(ebseqinfile) | perl -ne 'print "mol"; s/"([\t|\n])/.norm"$$1/g; print') <(tail -n +2 $(exprdata).norm.temp) > $(exprdata).norm
 			paste $(ebseqinfile) <(cut -f 2- $(exprdata).norm) > $(exprdata).temp
-			$(BINDIR)/fill $(seqlist) < $(exprdata).temp | sort > $(exprdata)
+			$(BINDIR)/fill $(seqlist) < <(tail -n +2 $(exprdata).temp | tr -d '"') | sort > $(exprdata)
 
 $(output):		$(foldchanges) $(readsmapped) $(exprdata)
 			wc -l $(foldchanges) $(readsmapped) $(exprdata)
-			paste <(tail -n +2 $(foldchanges)) <(tail -n +2 $(readsmapped) | cut -f 2-) <(tail -n +2 $(exprdata) | cut -f 2-)
+			paste $(foldchanges) <(cut -f 2- $(readsmapped)) <(cut -f 2- $(exprdata)) > $(output)

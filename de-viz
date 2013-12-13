@@ -1,4 +1,4 @@
-#!/usr/bin/env make -f
+#!/usr/bin/make -f
 
 # Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
 #
@@ -28,7 +28,7 @@
 
 
 SHELL := /usr/bin/env bash
-MKFILE=$(CURDIR)/$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
+MKFILE=$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 BINDIR=$(shell dirname $(MKFILE))
 define PROG_USAGE
 

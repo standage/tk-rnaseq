@@ -48,8 +48,9 @@ while(my $line = <STDIN>)
   {
     printf(STDERR "error: some rows have %d fields, while some have %d\n",
            $numfields, scalar(@fields));
-    exit(1);
+    die();
   }
+  print $line;
 }
 
 my @filler;

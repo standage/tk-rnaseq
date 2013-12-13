@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+bindir=$1
+shift
+workdir=$1
+shift
+seqlist=$1
+shift
+out=$1
+shift
+
+for file in "$@"
+do
+  fname=${workdir}/`basename $file`
+  ${bindir}/smr -d '\t' -o ${fname}.readsmapped $file &
+done
+wait
+
+for file in "$@"
+do
+  fname=${workdir}/`basename $file`
+  ${bindir}/fill ${seqlist} < ${fname}.readsmapped | sort > ${fname}.readsmapped.filledin &
+done
+wait
+
+fname=${workdir}/`basename $1`
+cp ${fname}.readsmapped.filledin ${out}
+shift
+for file in "$@"
+do
+  fname=${workdir}/`basename $file`
+  paste ${out} <(cut -f 2 ${fname}.readsmapped.filledin) > ${out}.tmp
+  mv ${out}.tmp ${out}
+done
