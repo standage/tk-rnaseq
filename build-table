@@ -34,6 +34,8 @@ Usage: build-table [options] ebseqinfile=rsem.output.txt   \\
   Options:
     output         file to which output will be written; default is
                    $(workdir)/expression-data.txt
+    parallel       run certain steps in parallel; will attempt to utilize N
+                   cores, where N is the number of samples
     workdir=DIR    director in which to place temporary files and, by default,
                    the output file; default is current directory
 
@@ -56,6 +58,10 @@ ifndef samfilepattern
 endif
 workdir=.
 samfilelist=$(shell ls $(samfilepattern) | tr '\n' ' ')
+smrscript=run-smr-par
+ifndef parallel
+  smrscript=run-smp-pro
+endif
 
 
 # Data files
@@ -86,7 +92,7 @@ $(foldchanges):		$(ebseqoutfile) $(seqlist)
 			$(BINDIR)/fill $(seqlist) < <(tail -n +2 $(foldchanges).temp) | sort > $(foldchanges)
 
 $(readsmapped):		$(samfilelist) $(BINDIR)/smr $(seqlist)
-			$(BINDIR)/run-smr-par $(BINDIR) $(workdir) $(seqlist) $(readsmapped) $(samfilelist)
+			$(BINDIR)/$(smrscript) $(BINDIR) $(workdir) $(seqlist) $(readsmapped) $(samfilelist)
 
 
 $(exprdata):		$(ebseqinfile) $(seqlist)
