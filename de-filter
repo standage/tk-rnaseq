@@ -1,0 +1,143 @@
+#!/usr/bin/env Rscript
+
+# Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# ------------------------------------------------------------------------------
+# 
+# ------------------------------------------------------------------------------
+
+library("getopt")
+
+print_usage <- function(file=stderr())
+{
+  cat("
+de-filter: analyze mapping data to filter genes or transcripts in a differential
+           expression analysis
+
+Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
+  Options:
+    -h|--help                   print this help message and exit
+    -n|--numsamples: INT,INT    the number of samples in each of the two
+                                conditions; if not provided explicitly, program
+                                will attempt to guess the number of samples per
+                                condition (total/2 samples each; will exit
+                                gracefully if total is odd)
+    -r|--readsbycond: INT       option used to remove gene/transcript sequences
+                                that do not have enough data to accurately
+                                estimate expression levels; specifies minimum
+                                number of reads allowed per sequence per
+                                condition; default is 1000
+    -t|--totalreads: INT        option used to remove gene/transcript sequences
+                                whose expression levels are so high that they
+                                are clear outliers and are likely to have a
+                                confounding influence on the entire expression
+                                analysis; specifies maximum total number of
+                                reads allowed to map to a sequence across both
+                                conditions; default is 1000000
+    -v|--varfactor: REAL        option used to control sample-level variability
+                                within a condition; specifies a factor ∂ such
+                                that any sequence meeting the criterion µ < ∂σ
+                                is removed, where µ is the mean number of reads
+                                mapped within the condition and σ is the
+                                standard deviation of reads mapped within the
+                                condition; default is 1.0
+    -z|--nonzeros: INT          option used to control sample-level variability
+                                within a condition; specifies minimum number of
+                                nonzero readsmapped values allowed per
+                                condition; default is numsamples - 2\n\n",
+    file=file)
+}
+
+spec <- matrix( c("debug",       'd', 0, "logical",
+                  "help",        'h', 0, "logical",
+                  "numsamples",  'n', 1, "character",
+                  "readsbycond", 'r', 1, "integer",
+                  "totalreads",  't', 1, "integer",
+                  "varfactor",   'v', 1, "double",
+                  "nonzeros",    'z', 1, "integer"),
+                byrow=TRUE, ncol=4)
+
+opt <- getopt(spec)
+if(!is.null(opt$help))
+{
+  print_usage(file=stdout());
+  q(save="no", status=0);
+}
+
+if( is.null(opt$debug) )       { opt$debug <- FALSE }
+if( is.null(opt$readsbycond) ) { opt$readsbycond <- 1000 }
+if( is.null(opt$totalreads) )  { opt$totalreads  <- 1000000 }
+if( is.null(opt$varfactor) )   { opt$varfactor   <- 1.0 }
+
+data <- read.table(file("stdin"), header=TRUE, sep="\t", quote="")
+data.dim <- dim(data)
+if( is.null(opt$numsamples) )
+{
+  total.samples <- (data.dim[2] - 5) / 3
+  half.samples <- as.integer(total.samples / 2)
+  if(total.samples %% 2 == 0)
+  {
+    opt$numsamples <- sprintf("%d,%d", half.samples, half.samples)
+  }
+  else
+  {
+    cat("error: cannot guess number of samples for each condition; please
+        provide this information\n")
+    print_usage(file=stderr())
+    q(save="no", status=1)
+  }
+}
+num.samples <- as.integer(unlist(strsplit(opt$numsamples, ",")))
+if(opt$debug)
+{
+  cat(sprintf("Num samples str: %s\n", opt$numsamples), file=stderr())
+}
+if( is.null(opt$nonzeros) ) { opt$nonzeros <- max(as.vector(num.samples)) - 2 }
+
+if(opt$debug)
+{
+  cat(sprintf("Table dimensions:       %dx%d\n", data.dim[1], data.dim[2]),
+      file=stderr())
+  cat(sprintf("Number of samples:      %d,%d\n", num.samples[1],num.samples[2]),
+      file=stderr())
+  cat(sprintf("Min reads by condition: %d\n", opt$readsbycond), file=stderr())
+  cat(sprintf("Max total reads:        %d\n", opt$totalreads), file=stderr())
+  cat(sprintf("Var factor:             %.4f\n", opt$varfactor), file=stderr())
+  cat(sprintf("Minimum nonzeros:       %d\n", opt$nonzeros), file=stderr())
+}
+
+c1.cols <- c(6,                6+num.samples[1]-1)
+c2.cols <- c(6+num.samples[1], 6+num.samples[1]+num.samples[2]-1)
+data.c1.reads <- data[,c1.cols[1]:c1.cols[2]]
+data.c2.reads <- data[,c2.cols[1]:c2.cols[2]]
+
+data.readsmapped.c1 <- rowSums(data.c1.reads)
+data.readsmapped.c2 <- rowSums(data.c1.reads)
+data.samples.c1     <- rowSums(data.c1.reads > 0)
+data.samples.c2     <- rowSums(data.c2.reads > 0)
+data.means.c1       <- as.numeric(apply(data.c1.reads, 1, mean))
+data.means.c2       <- as.numeric(apply(data.c2.reads, 1, mean))
+data.stdevs.c1      <- as.numeric(apply(data.c1.reads, 1, sd))
+data.stdevs.c2      <- as.numeric(apply(data.c2.reads, 1, sd))
+
+indices.to.keep <- data.readsmapped.c1 > opt$readsbycond &
+                   data.readsmapped.c2 > opt$readsbycond &
+                   (data.readsmapped.c1 + data.readsmapped.c2) < opt$totalreads &
+                   data.samples.c1 >= opt$nonzeros &
+                   data.samples.c2 >= opt$nonzeros &
+                   data.means.c1 >= (opt$varfactor * data.stdevs.c1) &
+                   data.means.c2 >= (opt$varfactor * data.stdevs.c2)
+data.to.keep <- data[indices.to.keep,]
+write.table(data.to.keep, file="", sep="\t", quote=FALSE, row.names=FALSE)
