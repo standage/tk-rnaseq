@@ -48,7 +48,7 @@ Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
                                 conditions; default is 1000000
     -v|--varfactor: REAL        option used to control sample-level variability
                                 within a condition; specifies a factor ∂ such
-                                that any sequence meeting the criterion µ < ∂σ
+                                that any sequence meeting the criterion µ∂ ≤ σ
                                 is removed, where µ is the mean number of reads
                                 mapped within the condition and σ is the
                                 standard deviation of reads mapped within the
@@ -124,7 +124,7 @@ data.c1.reads <- data[,c1.cols[1]:c1.cols[2]]
 data.c2.reads <- data[,c2.cols[1]:c2.cols[2]]
 
 data.readsmapped.c1 <- rowSums(data.c1.reads)
-data.readsmapped.c2 <- rowSums(data.c1.reads)
+data.readsmapped.c2 <- rowSums(data.c2.reads)
 data.samples.c1     <- rowSums(data.c1.reads > 0)
 data.samples.c2     <- rowSums(data.c2.reads > 0)
 data.means.c1       <- as.numeric(apply(data.c1.reads, 1, mean))
@@ -137,7 +137,7 @@ indices.to.keep <- data.readsmapped.c1 > opt$readsbycond &
                    (data.readsmapped.c1 + data.readsmapped.c2) < opt$totalreads &
                    data.samples.c1 >= opt$nonzeros &
                    data.samples.c2 >= opt$nonzeros &
-                   data.means.c1 >= (opt$varfactor * data.stdevs.c1) &
-                   data.means.c2 >= (opt$varfactor * data.stdevs.c2)
+                   (data.means.c1 * opt$varfactor) > data.stdevs.c1 &
+                   (data.means.c2 * opt$varfactor) > data.stdevs.c2
 data.to.keep <- data[indices.to.keep,]
 write.table(data.to.keep, file="", sep="\t", quote=FALSE, row.names=FALSE)
