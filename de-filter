@@ -29,6 +29,7 @@ de-filter: analyze mapping data to filter genes or transcripts in a differential
 Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
   Options:
     -h|--help                   print this help message and exit
+    -H|--noheader               input file has no header
     -n|--numsamples: INT,INT    the number of samples in each of the two
                                 conditions; if not provided explicitly, program
                                 will attempt to guess the number of samples per
@@ -60,8 +61,10 @@ Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
     file=file)
 }
 
-spec <- matrix( c("debug",       'd', 0, "logical",
+spec <- matrix( c("column",      'c', 1, "integer",
+                  "debug",       'd', 0, "logical",
                   "help",        'h', 0, "logical",
+                  "noheader",    'H', 0, "logical",
                   "numsamples",  'n', 1, "character",
                   "readsbycond", 'r', 1, "integer",
                   "totalreads",  't', 1, "integer",
@@ -76,12 +79,14 @@ if(!is.null(opt$help))
   q(save="no", status=0);
 }
 
+if( is.null(opt$column) )       { opt$column <- 8 }
 if( is.null(opt$debug) )       { opt$debug <- FALSE }
+if( is.null(opt$noheader) )    { opt$hasheader <- TRUE } else { opt$hasheader <- FALSE }
 if( is.null(opt$readsbycond) ) { opt$readsbycond <- 1000 }
 if( is.null(opt$totalreads) )  { opt$totalreads  <- 1000000 }
 if( is.null(opt$varfactor) )   { opt$varfactor   <- 1.0 }
 
-data <- read.table(file("stdin"), header=TRUE, sep="\t", quote="")
+data <- read.table(file("stdin"), header=opt$hasheader, sep="\t", quote="")
 data.dim <- dim(data)
 if( is.null(opt$numsamples) )
 {
@@ -93,8 +98,9 @@ if( is.null(opt$numsamples) )
   }
   else
   {
-    cat("error: cannot guess number of samples for each condition; please
-        provide this information\n")
+    cat(paste("error: cannot guess number of samples for each condition; please",
+              "provide this information\n"),
+        file=stderr())
     print_usage(file=stderr())
     q(save="no", status=1)
   }
@@ -118,8 +124,8 @@ if(opt$debug)
   cat(sprintf("Minimum nonzeros:       %d\n", opt$nonzeros), file=stderr())
 }
 
-c1.cols <- c(6,                6+num.samples[1]-1)
-c2.cols <- c(6+num.samples[1], 6+num.samples[1]+num.samples[2]-1)
+c1.cols <- c(opt$column,                opt$column+num.samples[1]-1)
+c2.cols <- c(opt$column+num.samples[1], opt$column+num.samples[1]+num.samples[2]-1)
 data.c1.reads <- data[,c1.cols[1]:c1.cols[2]]
 data.c2.reads <- data[,c2.cols[1]:c2.cols[2]]
 
@@ -140,4 +146,5 @@ indices.to.keep <- data.readsmapped.c1 > opt$readsbycond &
                    (data.means.c1 * opt$varfactor) > data.stdevs.c1 &
                    (data.means.c2 * opt$varfactor) > data.stdevs.c2
 data.to.keep <- data[indices.to.keep,]
-write.table(data.to.keep, file="", sep="\t", quote=FALSE, row.names=FALSE)
+write.table(data.to.keep, file="", sep="\t", quote=FALSE, row.names=FALSE,
+            col.names=opt$hasheader)
