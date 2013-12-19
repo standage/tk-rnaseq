@@ -112,5 +112,6 @@ if(!is.null(opt$norm))
 
 hm.col <- unlist(strsplit(opt$colors, ","))
 png(opt$heatmap, width=1200, height=1200, res=150)
-heatmap(data.matrix(data), col=colorRampPalette(hm.col)(64), labRow=NA, Rowv=NA)
+heatmap(data.matrix(data), col=colorRampPalette(hm.col)(64), labRow=NA,
+        Rowv=opt$rows, Colv=opt$columns)
 devnum <- dev.off()
