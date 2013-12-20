@@ -24,12 +24,14 @@ SHELL := /usr/bin/env bash
 MKFILE=$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 BINDIR=$(shell dirname $(MKFILE))
 define PROG_USAGE
+workdir=.
 
 build-table: build a table of gene/transcript expression data including fold
              changes, reads mapped, and expression values
 
-Usage: build-table [options] ebseqinfile=rsem.output.txt   \\
-                             ebseqoutfile=ebseq.output.txt \\
+Usage: build-table [options] ebseqinfile=rsem.output.txt   \
+                             ebseqoutfile=ebseq.output.txt \
+                             fasta=sequences.fa            \
                              samfilepattern=/path/to/data/my.species.*.sam all
   Options:
     output         file to which output will be written; default is
@@ -56,7 +58,6 @@ endif
 ifndef samfilepattern
   samfilepattern=*.sam
 endif
-workdir=.
 samfilelist=$(shell ls $(samfilepattern) | tr '\n' ' ')
 smrscript=run-smr-par
 ifneq ($(parallel), yes)
