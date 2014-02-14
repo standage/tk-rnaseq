@@ -32,7 +32,7 @@ build-table: build a table of gene/transcript expression data including fold
 Usage: build-table [options] ebseqinfile=rsem.output.txt   \
                              ebseqoutfile=ebseq.output.txt \
                              fasta=sequences.fa            \
-                             samfilepattern=/path/to/data/my.species.*.sam all
+                             bamfilepattern=/path/to/data/my.species.*.bam all
   Options:
     output         file to which output will be written; default is
                    $(workdir)/expression-data.txt
@@ -56,14 +56,10 @@ ifndef fasta
   $(error fasta is not specified $(PROG_USAGE))
 endif
 ifndef samfilepattern
-  samfilepattern=*.sam
+  bamfilepattern=*.sam
 endif
-samfilelist=$(shell ls $(samfilepattern) | tr '\n' ' ')
-smrscript=run-smr-par
-ifneq ($(parallel), yes)
-  smrscript=run-smr-pro
-endif
-
+bamfilelist=$(shell ls $(bamfilepattern) | tr '\n' ' ')
+readsmappedfilelist=$(patsubst %.bam, %.rm, $(bamfilelist))
 
 # Data files
 foldchanges=$(workdir)/foldchanges.txt
@@ -72,6 +68,7 @@ output=$(workdir)/expression-data.txt
 exprdata=$(workdir)/exprdata.txt
 seqlist=$(workdir)/seqlist.txt
 
+.PRECIOUS:		$(readsmappedfilelist)
 
 usage:
 			@- echo "$$PROG_USAGE"
@@ -82,7 +79,10 @@ help:			usage
 all:			$(output)
 			
 
-$(seqlist):		$(fasta)
+$(workdir):		
+			mkdir -p $(workdir)
+
+$(seqlist):		$(fasta) $(workdir)
 			perl -ne 'm/^>(\S+)/ and print "$$1\n"' < $(fasta) > $(seqlist)
 
 $(BINDIR)/smr:		$(BINDIR)/smr.cpp
@@ -92,8 +92,12 @@ $(foldchanges):		$(ebseqoutfile) $(seqlist)
 			$(BINDIR)/addmag < $(ebseqoutfile) > $(foldchanges).temp
 			$(BINDIR)/fill $(seqlist) < <(tail -n +2 $(foldchanges).temp) | sort > $(foldchanges)
 
-$(readsmapped):		$(samfilelist) $(BINDIR)/smr $(seqlist)
-			$(BINDIR)/$(smrscript) $(BINDIR) $(workdir) $(seqlist) $(readsmapped) $(samfilelist)
+$(readsmapped):		$(readsmappedfilelist) $(workdir)
+			$(BINDIR)/smrmerge $@ $(readsmappedfilelist)
+
+%.rm:			%.bam $(BINDIR)/smr $(seqlist)
+			$(BINDIR)/smr -d '\t' -o $@.temp <(samtools view $<)
+			$(BINDIR)/fill $(seqlist) < $@.temp | sort > $@
 
 
 $(exprdata):		$(ebseqinfile) $(seqlist)

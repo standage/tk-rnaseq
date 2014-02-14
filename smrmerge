@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+out=$1 
+shift
+
+cp $1 $out
+shift
+for file in "$@"
+do
+  paste $out <(cut -f 2 $file) > ${out}.temp
+  mv ${out}.temp $out
+done
+
