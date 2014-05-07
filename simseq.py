@@ -30,6 +30,10 @@ class Molecule:
     self.seqid = seqid
     self.abundance = int(abundance)
 
+  def __str__(self):
+    return "[%s:%d]" % (self.seqid, self.abundance)
+
+
 class Sample:
   """
   Represents a sample of RNA, with a baseline abundance and a list of molecules
@@ -39,6 +43,9 @@ class Sample:
     self.id = sampleid
     self.baseline = 100
     self.molecules = []
+
+  def __str__(self):
+    return "[%s:%d %d]" % (self.id, self.baseline, len(self.molecules))
 
 def id_safe(seqid):
   """
@@ -120,10 +127,10 @@ def load_config(argv):
         line = line.rstrip()
         if line == "" or line.startswith("#"):
           continue
-        if line.startswith("--baseline="):
-          baseline_args.append(value[11:])
+        elif line.startswith("--baseline="):
+          baseline_args.append(line[11:])
         else:
-          sampling_args.append(value)
+          sampling_args.append(line)
     elif key in ("-h", "--help"):
       print_usage(sys.stdout)
       exit(0)
@@ -157,7 +164,7 @@ def load_config(argv):
         sample.baseline = int(baselines[sampleid])
       samples[sample.id] = sample
     mol = Molecule(seqid, int(seqabund))
-    samples[sample.id].molecules.append(mol)
+    samples[sampleid].molecules.append(mol)
 
   return params, samples
 
@@ -168,7 +175,6 @@ if __name__ == "__main__":
     for mol in sample.molecules:
       abundance = sample.baseline * mol.abundance
       cmd = "wgsim %s -N %d %s/%s.fa %s/%s.%s.1.fq %s/%s.%s.2.fq" % (params["wgsim-opts"], abundance, params["tmpdir"], mol.seqid, params["tmpdir"], sampleid, mol.seqid, params["tmpdir"], sampleid, mol.seqid)
-      print >> sys.stderr, "calling: "+ cmd
       subprocess.call(cmd, shell=True)
 
   for sampleid in samples:
