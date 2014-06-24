@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-# Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
+# Copyright (c) 2013-2014, Daniel S. Standage <daniel.standage@gmail.com>
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -15,7 +15,46 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 # ------------------------------------------------------------------------------
-# 
+# This program is used to filter sequences for use in a differential expression
+# analysis. An initial analysis is used to build a table consisting of several
+# values for each molecule (gene, transcript, etc), including number of reads
+# mapped for each sample, estimated expression values, fold changes, and so on.
+# This data is then provided as input to this program, which will filter based
+# on user-selected criteria. Filtering is used primarily to remove molecules
+# that have too little data to make reliable calls or have to much data that
+# they are clear outliers and should be excluded.
+#
+# Expected input is a tab-delimited text file with one row for each molecule
+# (gene, transcript, etc) and the following columns for each row.
+#
+#   - ID
+#   - Length (bp)
+#   - posterior probability of being equally expressed across conditions
+#     (PPEE reported by EBSeq)
+#   - posterior probability of being differentially expressed across conditions
+#     (PPDE reported by EBSeq)
+#   - posterior fold change (PostFC reported by EBSeq)
+#   - fold change (RealFC reported by EBSeq)
+#   - magnitude of PostFC (that is, 1/PostFC if PostFC < 1)
+#   - magnitude of RealFC (that is, 1/RealFC if RealFC < 1)
+#   - N columns containing the number of reads mapping to the molecule from each
+#     of the N samples/replicates in condition 1
+#   - M columns containing the number of reads mapping to the molecule from each
+#     of the M samples/replicates in condition 2
+#   - N columns containing the estimated expression values for the molecule from
+#     each of the N samples/replicates in condition 1
+#   - M columns containing the estimated expression values for the molecule from
+#     each of the M samples/replicates in condition 2
+#   - N columns containing the normalized expression values for the molecule (as
+#     determined by MedianNorm) from each of the N samples/replicates in
+#     condition 1
+#   - M columns containing the normalized expression values for the molecule (as
+#     determined by MedianNorm) from each of the M samples/replicates in
+#     condition 2
+#
+# The total number of columns in the matrix should be 8 + (3*(N+M)). For
+# example, if you have 6 replicates for condition 1 and 6 for condition 2, there
+# should be 8 + (3*(6+6)) = 8 + 36 = 44 columns in the matrix.
 # ------------------------------------------------------------------------------
 
 library("getopt")
@@ -28,36 +67,32 @@ de-filter: analyze mapping data to filter genes or transcripts in a differential
 
 Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
   Options:
-    -h|--help                   print this help message and exit
-    -H|--noheader               input file has no header
-    -n|--numsamples: INT,INT    the number of samples in each of the two
-                                conditions; if not provided explicitly, program
-                                will attempt to guess the number of samples per
-                                condition (total/2 samples each; will exit
-                                gracefully if total is odd)
-    -r|--readsbycond: INT       option used to remove gene/transcript sequences
-                                that do not have enough data to accurately
-                                estimate expression levels; specifies minimum
-                                number of reads allowed per sequence per
-                                condition; default is 1000
-    -t|--totalreads: INT        option used to remove gene/transcript sequences
-                                whose expression levels are so high that they
-                                are clear outliers and are likely to have a
-                                confounding influence on the entire expression
-                                analysis; specifies maximum total number of
-                                reads allowed to map to a sequence across both
-                                conditions; default is 1000000
-    -v|--varfactor: REAL        option used to control sample-level variability
-                                within a condition; specifies a factor ∂ such
-                                that any sequence meeting the criterion µ∂ ≤ σ
-                                is removed, where µ is the mean number of reads
-                                mapped within the condition and σ is the
-                                standard deviation of reads mapped within the
-                                condition; default is 1.0
-    -z|--nonzeros: INT          option used to control sample-level variability
-                                within a condition; specifies minimum number of
-                                nonzero readsmapped values allowed per
-                                condition; default is numsamples - 2\n\n",
+    -h|--help                    print this help message and exit
+    -H|--noheader                input file has no header
+    -s|--numsamples: INT,INT     the number of samples in each of the two
+                                 conditions; if not provided explicitly, program
+                                 will attempt to guess the number of samples per
+                                 condition (total/2 samples each; will exit
+                                 gracefully if total is odd)
+    -r|--reads: INT,INT          option used to specify an acceptable range for
+                                 reads mapped to the molecule for each
+                                 condition; if the total number of reads mapped
+                                 for one or both conditions is outside this
+                                 range, the molecule will be discarded; default
+                                 is 0,Inf
+    -n|--normreads: REAL,REAL    same as option '-r', but normalized by the
+                                 length of the molecule; default is 0,Inf
+    -v|--varfactor: REAL         option used to control sample-level variability
+                                 within a condition; specifies a factor ∂ such
+                                 that any sequence meeting the criterion µ∂ ≤ σ
+                                 is discarded, where µ is the mean number of
+                                 reads mapped within the condition and σ is the
+                                 standard deviation of reads mapped within the
+                                 condition; default is Inf
+    -z|--nonzeros: INT           option used to control sample-level variability
+                                 within a condition; specifies minimum number of
+                                 nonzero readsmapped values allowed per
+                                 condition; default is 0\n\n",
     file=file)
 }
 
@@ -65,9 +100,9 @@ spec <- matrix( c("column",      'c', 1, "integer",
                   "debug",       'd', 0, "logical",
                   "help",        'h', 0, "logical",
                   "noheader",    'H', 0, "logical",
-                  "numsamples",  'n', 1, "character",
-                  "readsbycond", 'r', 1, "integer",
-                  "totalreads",  't', 1, "integer",
+                  "numsamples",  's', 1, "character",
+                  "reads",       'r', 1, "character",
+                  "normreads",   'n', 1, "character",
                   "varfactor",   'v', 1, "double",
                   "nonzeros",    'z', 1, "integer"),
                 byrow=TRUE, ncol=4)
@@ -79,12 +114,17 @@ if(!is.null(opt$help))
   q(save="no", status=0);
 }
 
-if( is.null(opt$column) )       { opt$column <- 8 }
-if( is.null(opt$debug) )       { opt$debug <- FALSE }
-if( is.null(opt$noheader) )    { opt$hasheader <- TRUE } else { opt$hasheader <- FALSE }
-if( is.null(opt$readsbycond) ) { opt$readsbycond <- 1000 }
-if( is.null(opt$totalreads) )  { opt$totalreads  <- 1000000 }
-if( is.null(opt$varfactor) )   { opt$varfactor   <- 1.0 }
+# Set option defaults
+if( is.null(opt$column) )    { opt$column    <- 9 }
+if( is.null(opt$debug) )     { opt$debug     <- FALSE }
+if( is.null(opt$noheader) )  { opt$hasheader <- TRUE } else { opt$hasheader <- FALSE }
+if( is.null(opt$reads) )     { opt$reads     <- "0,Inf" }
+if( is.null(opt$normreads) ) { opt$normreads <- "0.0,Inf" }
+if( is.null(opt$varfactor) ) { opt$varfactor <- Inf }
+if( is.null(opt$nonzeros) )  { opt$nonzeros  <- 0 }
+
+reads     <- as.numeric(unlist(strsplit(opt$reads, ",")))
+normreads <- as.numeric(unlist(strsplit(opt$normreads, ",")))
 
 data <- read.table(file("stdin"), header=opt$hasheader, sep="\t", quote="")
 data.dim <- dim(data)
@@ -106,22 +146,19 @@ if( is.null(opt$numsamples) )
   }
 }
 num.samples <- as.integer(unlist(strsplit(opt$numsamples, ",")))
-if(opt$debug)
-{
-  cat(sprintf("Num samples str: %s\n", opt$numsamples), file=stderr())
-}
-if( is.null(opt$nonzeros) ) { opt$nonzeros <- max(as.vector(num.samples)) - 2 }
 
 if(opt$debug)
 {
-  cat(sprintf("Table dimensions:       %dx%d\n", data.dim[1], data.dim[2]),
+  cat(sprintf("Table dimensions:         %dx%d\n", data.dim[1], data.dim[2]),
       file=stderr())
-  cat(sprintf("Number of samples:      %d,%d\n", num.samples[1],num.samples[2]),
+  cat(sprintf("Number of samples:        %d,%d\n", num.samples[1],
+      num.samples[2]), file=stderr())
+  cat(sprintf("Reads per condition:      [%.0f, %.0f]\n", reads[1], reads[2]),
       file=stderr())
-  cat(sprintf("Min reads by condition: %d\n", opt$readsbycond), file=stderr())
-  cat(sprintf("Max total reads:        %d\n", opt$totalreads), file=stderr())
-  cat(sprintf("Var factor:             %.4f\n", opt$varfactor), file=stderr())
-  cat(sprintf("Minimum nonzeros:       %d\n", opt$nonzeros), file=stderr())
+  cat(sprintf("Reads/bp per condition:   [%.2f, %.2f]\n", normreads[1],
+      normreads[2]), file=stderr())
+  cat(sprintf("Variability factor:       %.2f\n", opt$varfactor), file=stderr())
+  cat(sprintf("Min non-0s per condition: %d\n", opt$nonzeros), file=stderr())
 }
 
 c1.cols <- c(opt$column,                opt$column+num.samples[1]-1)
@@ -131,6 +168,8 @@ data.c2.reads <- data[,c2.cols[1]:c2.cols[2]]
 
 data.readsmapped.c1 <- rowSums(data.c1.reads)
 data.readsmapped.c2 <- rowSums(data.c2.reads)
+data.rmpbp.c1       <- data.readsmapped.c1 / data$V2
+data.rmpbp.c2       <- data.readsmapped.c2 / data$V2
 data.samples.c1     <- rowSums(data.c1.reads > 0)
 data.samples.c2     <- rowSums(data.c2.reads > 0)
 data.means.c1       <- as.numeric(apply(data.c1.reads, 1, mean))
@@ -138,13 +177,18 @@ data.means.c2       <- as.numeric(apply(data.c2.reads, 1, mean))
 data.stdevs.c1      <- as.numeric(apply(data.c1.reads, 1, sd))
 data.stdevs.c2      <- as.numeric(apply(data.c2.reads, 1, sd))
 
-indices.to.keep <- data.readsmapped.c1 > opt$readsbycond &
-                   data.readsmapped.c2 > opt$readsbycond &
-                   (data.readsmapped.c1 + data.readsmapped.c2) < opt$totalreads &
+indices.to.keep <- data.readsmapped.c1 >= reads[1] &
+                   data.readsmapped.c2 >= reads[1] &
+                   data.readsmapped.c1 <= reads[2] &
+                   data.readsmapped.c2 <= reads[2] &
+                   data.rmpbp.c1 >= normreads[1] &
+                   data.rmpbp.c2 >= normreads[1] &
+                   data.rmpbp.c1 <= normreads[2] &
+                   data.rmpbp.c2 <= normreads[2] &
                    data.samples.c1 >= opt$nonzeros &
                    data.samples.c2 >= opt$nonzeros &
-                   (data.means.c1 * opt$varfactor) > data.stdevs.c1 &
-                   (data.means.c2 * opt$varfactor) > data.stdevs.c2
+                   (data.means.c1 * opt$varfactor) >= data.stdevs.c1 &
+                   (data.means.c2 * opt$varfactor) >= data.stdevs.c2
 data.to.keep <- data[indices.to.keep,]
 write.table(data.to.keep, file="", sep="\t", quote=FALSE, row.names=FALSE,
             col.names=opt$hasheader)

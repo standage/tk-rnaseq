@@ -55,8 +55,8 @@ endif
 ifndef fasta
   $(error fasta is not specified $(PROG_USAGE))
 endif
-ifndef samfilepattern
-  bamfilepattern=*.sam
+ifndef bamfilepattern
+  bamfilepattern=*.bam
 endif
 bamfilelist=$(shell ls $(bamfilepattern) | tr '\n' ' ')
 readsmappedfilelist=$(patsubst %.bam, %.rm, $(bamfilelist))

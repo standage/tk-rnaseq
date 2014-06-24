@@ -46,7 +46,7 @@ library("getopt")
 
 print_usage <- function(file=stderr())
 {
-  cat("
+  cat("
 heatmaker: generate a heatmap to visualize gene expression data; see the source
            code for a full description of the program inputs and outputs
 
@@ -83,8 +83,8 @@ spec <- matrix( c("columns", 'c', 0, "logical",
 opt <- getopt(spec)
 if(!is.null(opt$help))
 {
-  print_usage(file=stdout());
-  q(save="no", status=0);
+  print_usage(file=stdout())
+  q(save="no", status=0)
 }
 
 if( is.null(opt$columns) ) { opt$column  <- NA } else { opt$column <- NULL }
