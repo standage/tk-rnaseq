@@ -1,0 +1,9 @@
+#!/usr/bin/env perl
+use strict;
+use Bio::SeqIO;
+
+my $seqin = Bio::SeqIO->new( -fh => \*STDIN, -format => "Fasta" );
+while(my $seq = $seqin->next_seq)
+{
+  printf("%s\t%lu\n", $seq->id, $seq->length);
+}

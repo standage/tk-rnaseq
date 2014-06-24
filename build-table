@@ -67,6 +67,7 @@ readsmapped=$(workdir)/readsmapped.txt
 output=$(workdir)/expression-data.txt
 exprdata=$(workdir)/exprdata.txt
 seqlist=$(workdir)/seqlist.txt
+seqlengths=$(workdir)/seqlengths.txt
 
 .PRECIOUS:		$(readsmappedfilelist)
 
@@ -84,6 +85,9 @@ $(workdir):
 
 $(seqlist):		$(fasta) $(workdir)
 			perl -ne 'm/^>(\S+)/ and print "$$1\n"' < $(fasta) > $(seqlist)
+
+$(seqlengths):		$(fasta) $(workdir)
+			perl $(BINDIR)/seqlengths < $(fasta) | sort -k1,1 > $(seqlengths)
 
 $(BINDIR)/smr:		$(BINDIR)/smr.cpp
 			g++ -Wall -O3 -std=c++11 -o $(BINDIR)/smr $(BINDIR)/smr.cpp
@@ -106,6 +110,6 @@ $(exprdata):		$(ebseqinfile) $(seqlist)
 			paste $(ebseqinfile) <(cut -f 2- $(exprdata).norm) > $(exprdata).temp
 			$(BINDIR)/fill $(seqlist) < <(tail -n +2 $(exprdata).temp | tr -d '"') | sort > $(exprdata)
 
-$(output):		$(foldchanges) $(readsmapped) $(exprdata)
+$(output):		$(foldchanges) $(readsmapped) $(exprdata) $(seqlengths)
 			# wc -l $(foldchanges) $(readsmapped) $(exprdata)
-			paste $(foldchanges) <(cut -f 2- $(readsmapped)) <(cut -f 2- $(exprdata)) > $(output)
+			paste $(seqlengths) <(cut -f 2- $(foldchanges)) <(cut -f 2- $(readsmapped)) <(cut -f 2- $(exprdata)) > $(output)
