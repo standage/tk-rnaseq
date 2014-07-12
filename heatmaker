@@ -87,7 +87,7 @@ if(!is.null(opt$help))
   q(save="no", status=0)
 }
 
-if( is.null(opt$columns) ) { opt$column  <- NA } else { opt$column <- NULL }
+if( is.null(opt$columns) ) { opt$columns <- NA } else { opt$columns <- NULL }
 if( is.null(opt$heatmap) ) { opt$heatmap <- "heatmap.png" }
 if( is.null(opt$colors) )  { opt$colors  <- "yellow,blue" }
 if( is.null(opt$rows) )    { opt$rows    <- NA } else { opt$rows   <- NULL }

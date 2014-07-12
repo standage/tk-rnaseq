@@ -85,10 +85,9 @@ Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
     -v|--varfactor: REAL         option used to control sample-level variability
                                  within a condition; specifies a factor ∂ such
                                  that any sequence meeting the criterion µ∂ ≤ σ
-                                 is discarded, where µ is the mean number of
-                                 reads mapped within the condition and σ is the
-                                 standard deviation of reads mapped within the
-                                 condition; default is Inf
+                                 is discarded, where µ is the mean expression
+                                 level across replicates and σ is the standard
+                                 deviation across replicates; default is Inf
     -z|--nonzeros: INT           option used to control sample-level variability
                                  within a condition; specifies minimum number of
                                  nonzero readsmapped values allowed per
@@ -163,8 +162,15 @@ if(opt$debug)
 
 c1.cols <- c(opt$column,                opt$column+num.samples[1]-1)
 c2.cols <- c(opt$column+num.samples[1], opt$column+num.samples[1]+num.samples[2]-1)
+c1.exp.cols <- c(opt$column+(2*num.samples[1])+(2*num.samples[2]),
+                 opt$column+(3*num.samples[1])+(2*num.samples[2])-1)
+c2.exp.cols <- c(opt$column+(3*num.samples[1])+(2*num.samples[2]),
+                 opt$column+(3*num.samples[1])+(3*num.samples[2])-1)
+
 data.c1.reads <- data[,c1.cols[1]:c1.cols[2]]
 data.c2.reads <- data[,c2.cols[1]:c2.cols[2]]
+data.c1.exp.reads <- data[,c1.exp.cols[1]:c1.exp.cols[2]]
+data.c2.exp.reads <- data[,c2.exp.cols[1]:c2.exp.cols[2]]
 
 data.readsmapped.c1 <- rowSums(data.c1.reads)
 data.readsmapped.c2 <- rowSums(data.c2.reads)
@@ -172,10 +178,10 @@ data.rmpbp.c1       <- data.readsmapped.c1 / data$V2
 data.rmpbp.c2       <- data.readsmapped.c2 / data$V2
 data.samples.c1     <- rowSums(data.c1.reads > 0)
 data.samples.c2     <- rowSums(data.c2.reads > 0)
-data.means.c1       <- as.numeric(apply(data.c1.reads, 1, mean))
-data.means.c2       <- as.numeric(apply(data.c2.reads, 1, mean))
-data.stdevs.c1      <- as.numeric(apply(data.c1.reads, 1, sd))
-data.stdevs.c2      <- as.numeric(apply(data.c2.reads, 1, sd))
+data.means.c1       <- as.numeric(apply(data.c1.exp.reads, 1, mean))
+data.means.c2       <- as.numeric(apply(data.c2.exp.reads, 1, mean))
+data.stdevs.c1      <- as.numeric(apply(data.c1.exp.reads, 1, sd))
+data.stdevs.c2      <- as.numeric(apply(data.c2.exp.reads, 1, sd))
 
 indices.to.keep <- data.readsmapped.c1 >= reads[1] &
                    data.readsmapped.c2 >= reads[1] &
