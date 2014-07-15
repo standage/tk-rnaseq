@@ -67,6 +67,14 @@ de-filter: analyze mapping data to filter genes or transcripts in a differential
 
 Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
   Options:
+    -D|--density: REAL,REAL      for each condition, the read density for each
+                                 molecule is calculated by taking the sum of
+                                 reads mapped across all replicates and
+                                 normalizing by molecule length; this option
+                                 specifies an acceptable range for this value;
+                                 molecules with read density outside this range
+                                 will be discarded; default is 0,Inf (i.e. no
+                                 filtering)
     -h|--help                    print this help message and exit
     -H|--noheader                input file has no header
     -s|--numsamples: INT,INT     the number of samples in each of the two
@@ -74,34 +82,33 @@ Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
                                  will attempt to guess the number of samples per
                                  condition (total/2 samples each; will exit
                                  gracefully if total is odd)
-    -r|--reads: INT,INT          option used to specify an acceptable range for
-                                 reads mapped to the molecule for each
-                                 condition; if the total number of reads mapped
-                                 for one or both conditions is outside this
-                                 range, the molecule will be discarded; default
-                                 is 0,Inf
-    -n|--normreads: REAL,REAL    same as option '-r', but normalized by the
-                                 length of the molecule; default is 0,Inf
-    -v|--varfactor: REAL         option used to control sample-level variability
-                                 within a condition; specifies a factor ∂ such
-                                 that any sequence meeting the criterion µ∂ ≤ σ
-                                 is discarded, where µ is the mean expression
-                                 level across replicates and σ is the standard
-                                 deviation across replicates; default is Inf
-    -z|--nonzeros: INT           option used to control sample-level variability
-                                 within a condition; specifies minimum number of
-                                 nonzero readsmapped values allowed per
-                                 condition; default is 0\n\n",
+    -r|--reads: INT,INT          for each condition, the number of reads mapped
+                                 to each molecule is summed across all
+                                 replicates; this option specifies an acceptable
+                                 range for this value; molecules with more or
+                                 fewer mapped reads than specified will be
+                                 discarded; default is 0,Inf (i.e. no filtering)
+    -v|--varfactor: REAL         option used to control variability across
+                                 replicates within a condition; specifies a
+                                 factor ∂ such that any sequence meeting the
+                                 criterion µ∂ ≤ σ is discarded, where µ is the
+                                 mean expression level across replicates and σ
+                                 is the standard deviation across replicates;
+                                 default is Inf (i.e. no filtering)
+    -z|--nonzeros: INT           option used to control variability across
+                                 replicates within a condition; specifies minimum
+                                 number of nonzero read density values required
+                                 per condition; default is 0 (i.e. no filtering)\n\n",
     file=file)
 }
 
 spec <- matrix( c("column",      'c', 1, "integer",
+                  "density",     'D', 1, "character",
                   "debug",       'd', 0, "logical",
                   "help",        'h', 0, "logical",
                   "noheader",    'H', 0, "logical",
                   "numsamples",  's', 1, "character",
                   "reads",       'r', 1, "character",
-                  "normreads",   'n', 1, "character",
                   "varfactor",   'v', 1, "double",
                   "nonzeros",    'z', 1, "integer"),
                 byrow=TRUE, ncol=4)
@@ -118,18 +125,18 @@ if( is.null(opt$column) )    { opt$column    <- 9 }
 if( is.null(opt$debug) )     { opt$debug     <- FALSE }
 if( is.null(opt$noheader) )  { opt$hasheader <- TRUE } else { opt$hasheader <- FALSE }
 if( is.null(opt$reads) )     { opt$reads     <- "0,Inf" }
-if( is.null(opt$normreads) ) { opt$normreads <- "0.0,Inf" }
+if( is.null(opt$density) )   { opt$density   <- "0.0,Inf" }
 if( is.null(opt$varfactor) ) { opt$varfactor <- Inf }
 if( is.null(opt$nonzeros) )  { opt$nonzeros  <- 0 }
 
 reads     <- as.numeric(unlist(strsplit(opt$reads, ",")))
-normreads <- as.numeric(unlist(strsplit(opt$normreads, ",")))
+readdensity <- as.numeric(unlist(strsplit(opt$density, ",")))
 
 data <- read.table(file("stdin"), header=opt$hasheader, sep="\t", quote="")
 data.dim <- dim(data)
 if( is.null(opt$numsamples) )
 {
-  total.samples <- (data.dim[2] - 5) / 3
+  total.samples <- (data.dim[2] - (opt$column - 1)) / 3
   half.samples <- as.integer(total.samples / 2)
   if(total.samples %% 2 == 0)
   {
@@ -154,8 +161,8 @@ if(opt$debug)
       num.samples[2]), file=stderr())
   cat(sprintf("Reads per condition:      [%.0f, %.0f]\n", reads[1], reads[2]),
       file=stderr())
-  cat(sprintf("Reads/bp per condition:   [%.2f, %.2f]\n", normreads[1],
-      normreads[2]), file=stderr())
+  cat(sprintf("Reads/bp per condition:   [%.2f, %.2f]\n", readdensity[1],
+      readdensity[2]), file=stderr())
   cat(sprintf("Variability factor:       %.2f\n", opt$varfactor), file=stderr())
   cat(sprintf("Min non-0s per condition: %d\n", opt$nonzeros), file=stderr())
 }
@@ -187,10 +194,10 @@ indices.to.keep <- data.readsmapped.c1 >= reads[1] &
                    data.readsmapped.c2 >= reads[1] &
                    data.readsmapped.c1 <= reads[2] &
                    data.readsmapped.c2 <= reads[2] &
-                   data.rmpbp.c1 >= normreads[1] &
-                   data.rmpbp.c2 >= normreads[1] &
-                   data.rmpbp.c1 <= normreads[2] &
-                   data.rmpbp.c2 <= normreads[2] &
+                   data.rmpbp.c1 >= readdensity[1] &
+                   data.rmpbp.c2 >= readdensity[1] &
+                   data.rmpbp.c1 <= readdensity[2] &
+                   data.rmpbp.c2 <= readdensity[2] &
                    data.samples.c1 >= opt$nonzeros &
                    data.samples.c2 >= opt$nonzeros &
                    (data.means.c1 * opt$varfactor) >= data.stdevs.c1 &
