@@ -88,12 +88,9 @@ Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
                                  range for this value; molecules with more or
                                  fewer mapped reads than specified will be
                                  discarded; default is 0,Inf (i.e. no filtering)
-    -v|--varfactor: REAL         option used to control variability across
-                                 replicates within a condition; specifies a
-                                 factor ∂ such that any sequence meeting the
-                                 criterion µ∂ ≤ σ is discarded, where µ is the
-                                 mean expression level across replicates and σ
-                                 is the standard deviation across replicates;
+    -v|--varcoef: REAL           specify maximum threshold for the variation
+                                 coefficient (std dev / mean) as applied to 
+                                 normalized expression values across replicates;
                                  default is Inf (i.e. no filtering)
     -z|--nonzeros: INT           option used to control variability across
                                  replicates within a condition; specifies minimum
@@ -109,7 +106,7 @@ spec <- matrix( c("column",      'c', 1, "integer",
                   "noheader",    'H', 0, "logical",
                   "numsamples",  's', 1, "character",
                   "reads",       'r', 1, "character",
-                  "varfactor",   'v', 1, "double",
+                  "varcoef",     'v', 1, "double",
                   "nonzeros",    'z', 1, "integer"),
                 byrow=TRUE, ncol=4)
 
@@ -126,7 +123,7 @@ if( is.null(opt$debug) )     { opt$debug     <- FALSE }
 if( is.null(opt$noheader) )  { opt$hasheader <- TRUE } else { opt$hasheader <- FALSE }
 if( is.null(opt$reads) )     { opt$reads     <- "0,Inf" }
 if( is.null(opt$density) )   { opt$density   <- "0.0,Inf" }
-if( is.null(opt$varfactor) ) { opt$varfactor <- Inf }
+if( is.null(opt$varcoef) )   { opt$varcoef <- Inf }
 if( is.null(opt$nonzeros) )  { opt$nonzeros  <- 0 }
 
 reads     <- as.numeric(unlist(strsplit(opt$reads, ",")))
@@ -163,7 +160,7 @@ if(opt$debug)
       file=stderr())
   cat(sprintf("Reads/bp per condition:   [%.2f, %.2f]\n", readdensity[1],
       readdensity[2]), file=stderr())
-  cat(sprintf("Variability factor:       %.2f\n", opt$varfactor), file=stderr())
+  cat(sprintf("Variability coefficient:  %.2f\n", opt$varcoef), file=stderr())
   cat(sprintf("Min non-0s per condition: %d\n", opt$nonzeros), file=stderr())
 }
 
@@ -200,8 +197,10 @@ indices.to.keep <- data.readsmapped.c1 >= reads[1] &
                    data.rmpbp.c2 <= readdensity[2] &
                    data.samples.c1 >= opt$nonzeros &
                    data.samples.c2 >= opt$nonzeros &
-                   (data.means.c1 * opt$varfactor) >= data.stdevs.c1 &
-                   (data.means.c2 * opt$varfactor) >= data.stdevs.c2
+                   data.means.c1 > 0 &
+                   data.means.c2 > 0 &
+                   data.stdevs.c1 / data.means.c1 < opt$varcoef &
+                   data.stdevs.c2 / data.means.c2 < opt$varcoef
 data.to.keep <- data[indices.to.keep,]
 write.table(data.to.keep, file="", sep="\t", quote=FALSE, row.names=FALSE,
             col.names=opt$hasheader)
