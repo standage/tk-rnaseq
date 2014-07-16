@@ -1,6 +1,7 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env perl
+use strict;
 
-# Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
+# Copyright (c) 2013-2014, Daniel S. Standage <daniel.standage@gmail.com>
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -25,7 +26,23 @@
 # this information.
 # ------------------------------------------------------------------------------
 
-data <- read.table(file("stdin"), sep="\t", header=TRUE)
-data$MagPostFC <- ifelse(data$PostFC < 1, 1 / data$PostFC, data$PostFC)
-data$MagRealFC <- ifelse(data$RealFC < 1, 1 / data$RealFC, data$RealFC)
-write.table(format(data, digits=4), file="", quote=FALSE, sep="\t")
+$_ = <STDIN>;
+chomp;
+s/"//g;
+$_ .= "\tMagPostFC\tMagRealFC\n";
+print;
+
+while(<STDIN>)
+{
+  s/"//g;
+  my @fields = split(/\t/);
+  my $magpfc = $fields[3];
+  my $magrfc = $fields[4];
+  if($magpfc < 1)
+  {
+    $magpfc = 1.0 / $magpfc;
+    $magrfc = 1.0 / $magrfc;
+  }
+  push(@fields, ($magpfc, $magrfc));
+  printf("%s". "\t%.4f" x 6 ."\n", @fields);
+}

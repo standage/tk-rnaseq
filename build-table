@@ -112,7 +112,7 @@ $(exprdata):		$(ebseqinfile) $(seqlist)
 			$(BINDIR)/fill $(seqlist) < <(tail -n +2 $(exprdata).temp | tr -d '"') | sort > $(exprdata)
 
 $(cvdata):		$(exprdata)
-			$(BINDIR)/expcv --norm=$(exprdata) < $(exprdata) | sort -k1,1 > $(cvdata)
+			$(BINDIR)/expcv --norm=$(ebseqinfile) < $(ebseqinfile) > $(cvdata)
 
 $(output):		$(foldchanges) $(readsmapped) $(exprdata) $(seqlengths) $(cvdata)
 			# wc -l $(foldchanges) $(readsmapped) $(exprdata)

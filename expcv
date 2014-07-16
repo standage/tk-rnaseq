@@ -109,5 +109,5 @@ cv.c2 <- stdevs.c2 / means.c2
 
 data.out <- cbind(cv.c1, cv.c2)
 row.names(data.out) <- row.names(data)
-write.table(format(data.out, digits=3), file="", sep="\t", quote=FALSE,
-            row.names=TRUE, col.names=FALSE)
+write.table(format(data.out, digits=3, scientific=FALSE), file="", sep="\t",
+            quote=FALSE, row.names=TRUE, col.names=FALSE)
