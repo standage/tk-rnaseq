@@ -74,7 +74,7 @@ data.dim <- dim(data)
 
 if( is.null(opt$numsamples) )
 {
-  total.samples <- (data.dim[2]) / 2
+  total.samples <- (data.dim[2])
   half.samples <- as.integer(total.samples / 2)
   if(total.samples %% 2 == 0)
   {
@@ -98,16 +98,16 @@ if(!is.null(opt$norm))
   data <- t(apply(data, 1, function(x){return(x/factors)}))
 }
 
-c1 <- data[,1:opt$numsamples[1]]
-c2 <- data[,opt$numsamples[1]+1:opt$numsamples[2]]
+c1 <- data[,1:num.samples[1]]
+c2 <- data[,num.samples[1]+1:num.samples[2]]
 means.c1  <- as.numeric(apply(c1, 1, mean))
 means.c2  <- as.numeric(apply(c2, 1, mean))
 stdevs.c1 <- as.numeric(apply(c1, 1, sd))
 stdevs.c2 <- as.numeric(apply(c2, 1, sd))
-cv.c1 <- stddevs.c1 / means.c1
-cv.c2 <- stddevs.c2 / means.c2
+cv.c1 <- stdevs.c1 / means.c1
+cv.c2 <- stdevs.c2 / means.c2
 
 data.out <- cbind(cv.c1, cv.c2)
 row.names(data.out) <- row.names(data)
-write.table(data.out, file="", sep="\t", quote=FALSE, row.names=TRUE,
-            col.names=FALSE)
+write.table(format(data.out, digits=3), file="", sep="\t", quote=FALSE,
+            row.names=TRUE, col.names=FALSE)

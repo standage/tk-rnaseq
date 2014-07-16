@@ -68,6 +68,7 @@ output=$(workdir)/expression-data.txt
 exprdata=$(workdir)/exprdata.txt
 seqlist=$(workdir)/seqlist.txt
 seqlengths=$(workdir)/seqlengths.txt
+cvdata=$(workdir)/expcv.txt
 
 .PRECIOUS:		$(readsmappedfilelist)
 
@@ -110,6 +111,9 @@ $(exprdata):		$(ebseqinfile) $(seqlist)
 			paste $(ebseqinfile) <(cut -f 2- $(exprdata).norm) > $(exprdata).temp
 			$(BINDIR)/fill $(seqlist) < <(tail -n +2 $(exprdata).temp | tr -d '"') | sort > $(exprdata)
 
-$(output):		$(foldchanges) $(readsmapped) $(exprdata) $(seqlengths)
+$(cvdata):		$(exprdata)
+			$(BINDIR)/expcv --norm=$(exprdata) < $(exprdata) | sort -k1,1 > $(cvdata)
+
+$(output):		$(foldchanges) $(readsmapped) $(exprdata) $(seqlengths) $(cvdata)
 			# wc -l $(foldchanges) $(readsmapped) $(exprdata)
-			paste $(seqlengths) <(cut -f 2- $(foldchanges)) <(cut -f 2- $(readsmapped)) <(cut -f 2- $(exprdata)) > $(output)
+			paste $(seqlengths) <(cut -f 2- $(foldchanges)) <(cut -f 2- $(readsmapped)) <(cut -f 2- $(exprdata)) > $(output) <(cut -f 2- $(cvdata))

@@ -28,4 +28,4 @@
 data <- read.table(file("stdin"), sep="\t", header=TRUE)
 data$MagPostFC <- ifelse(data$PostFC < 1, 1 / data$PostFC, data$PostFC)
 data$MagRealFC <- ifelse(data$RealFC < 1, 1 / data$RealFC, data$RealFC)
-write.table(data, file="", quote=FALSE, sep="\t")
+write.table(format(data, digits=4), file="", quote=FALSE, sep="\t")
