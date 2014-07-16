@@ -35,7 +35,7 @@ define PROG_USAGE
 de-viz: visualizations for differential expression analysis; see source code for
         a complete description of the inputs and outputs
 
-Usage: de-vis [options] ebseqin=rsem.output.txt ebseqout=ebseq.output.txt all
+Usage: de-viz [options] ebseqinfile=rsem.output.txt ebseqoutfile=ebseq.output.txt all
   Options:
     colors=COL,COL    a comma-separated pair of colors to use for heatmap;
                       default is colorblind-friendly 'yellow,blue'
