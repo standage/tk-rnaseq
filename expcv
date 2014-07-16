@@ -1,0 +1,113 @@
+#!/usr/bin/env Rscript
+
+# Copyright (c) 2013, Daniel S. Standage <daniel.standage@gmail.com>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+
+# ------------------------------------------------------------------------------
+# expcv: calculate coefficient of variance for a matrix of expression values
+# ------------------------------------------------------------------------------
+
+
+# MedianNorm borrowed from the EBSeq library version 1.1.6
+# See http://www.bioconductor.org/packages/devel/bioc/html/EBSeq.html
+MedianNorm <- function(data)
+{
+  geomeans <- exp( rowMeans(log(data)) )
+  apply(data, 2, function(cnts) median((cnts/geomeans)[geomeans > 0]))
+}
+
+library("getopt")
+
+print_usage <- function(file=stderr())
+{
+  cat("
+expcv: calculate coefficient of variance for a matrix of expression values; see 
+           the source code for a full description of the program inputs and
+           outputs
+
+Usage: heatmaker [options] < data-matrix.txt
+  Options:
+    -H|--noheader               indicate that data matrix has no header row
+    -h|--help:                  print this message and exit
+    -n|--norm: FILE             data matrix to be used for computing library size
+                                factors using normalization by median; default is no
+                                normalization
+    -s|--numsamples: INT,INT    the number of samples in each of the two
+                                conditions; if not provided explicitly, program
+                                will attempt to guess the number of samples per
+                                condition (total/2 samples each; will exit
+                                stubbornly but gracefully if total is odd)\n\n",
+    file=file)
+}
+
+spec <- matrix( c("noheader",   'H', 0, "logical",
+                  "help",       'h', 0, "logical",
+                  "norm",       'n', 1, "character",
+                  "numsamples", 's', 1, "character"),
+                byrow=TRUE, ncol=4)
+
+opt <- getopt(spec)
+if(!is.null(opt$help))
+{
+  print_usage(file=stdout())
+  q(save="no", status=0)
+}
+if( is.null(opt$noheader) )  { opt$hasheader <- TRUE } else { opt$hasheader <- FALSE }
+
+data <- read.table(file="stdin", header=opt$hasheader, sep="\t")
+row.names(data) <- data[,1]
+dimensions <- dim(data)
+data <- data[,2:dimensions[2]]
+data.dim <- dim(data)
+
+if( is.null(opt$numsamples) )
+{
+  total.samples <- (data.dim[2]) / 2
+  half.samples <- as.integer(total.samples / 2)
+  if(total.samples %% 2 == 0)
+  {
+    opt$numsamples <- sprintf("%d,%d", half.samples, half.samples)
+  }
+  else
+  {
+    cat(paste("error: cannot guess number of samples for each condition; please",
+              "provide this information\n"),
+        file=stderr())
+    print_usage(file=stderr())
+    q(save="no", status=1)
+  }
+}
+num.samples <- as.integer(unlist(strsplit(opt$numsamples, ",")))
+
+if(!is.null(opt$norm))
+{
+  norm.data <- data.matrix(read.table(opt$norm))
+  factors <- MedianNorm(norm.data)
+  data <- t(apply(data, 1, function(x){return(x/factors)}))
+}
+
+c1 <- data[,1:opt$numsamples[1]]
+c2 <- data[,opt$numsamples[1]+1:opt$numsamples[2]]
+means.c1  <- as.numeric(apply(c1, 1, mean))
+means.c2  <- as.numeric(apply(c2, 1, mean))
+stdevs.c1 <- as.numeric(apply(c1, 1, sd))
+stdevs.c2 <- as.numeric(apply(c2, 1, sd))
+cv.c1 <- stddevs.c1 / means.c1
+cv.c2 <- stddevs.c2 / means.c2
+
+data.out <- cbind(cv.c1, cv.c2)
+row.names(data.out) <- row.names(data)
+write.table(data.out, file="", sep="\t", quote=FALSE, row.names=TRUE,
+            col.names=FALSE)
