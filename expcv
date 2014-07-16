@@ -107,7 +107,7 @@ stdevs.c2 <- as.numeric(apply(c2, 1, sd))
 cv.c1 <- stdevs.c1 / means.c1
 cv.c2 <- stdevs.c2 / means.c2
 
-data.out <- cbind(cv.c1, cv.c2)
+data.out <- cbind(means.c1, stdevs.c1, cv.c1, means.c1, stdevs.c1, cv.c2)
 row.names(data.out) <- row.names(data)
 write.table(format(data.out, digits=3, scientific=FALSE), file="", sep="\t",
             quote=FALSE, row.names=TRUE, col.names=FALSE)

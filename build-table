@@ -23,8 +23,8 @@
 SHELL := /usr/bin/env bash
 MKFILE=$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 BINDIR=$(shell dirname $(MKFILE))
-define PROG_USAGE
 workdir=.
+define PROG_USAGE
 
 build-table: build a table of gene/transcript expression data including fold
              changes, reads mapped, and expression values
@@ -34,10 +34,8 @@ Usage: build-table [options] ebseqinfile=rsem.output.txt   \
                              fasta=sequences.fa            \
                              bamfilepattern=/path/to/data/my.species.*.bam all
   Options:
-    output         file to which output will be written; default is
-                   $(workdir)/expression-data.txt
-    parallel=yes   run certain steps in parallel; will attempt to utilize N
-                   cores, where N is the number of samples
+    output=FILE    file to which output will be written; default is
+                   $$(workdir)/expression-data.txt
     workdir=DIR    director in which to place temporary files and, by default,
                    the output file; default is current directory
 
