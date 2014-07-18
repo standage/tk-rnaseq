@@ -113,7 +113,7 @@ while(my $line = <STDIN>)
   push(@expression, \@expr);
 }
 
-printf("\@ATTRIBUTE %-35s {$c1label, $c2label}\n\n\@DATA\n", "caste");
+printf("\@ATTRIBUTE %-35s {$c1label, $c2label}\n\n\@DATA\n", "condition");
 my $nummols = scalar(@expression);
 for(my $i = 0; $i < $numsamples; $i++)
 {

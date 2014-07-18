@@ -16,7 +16,39 @@
 
 
 # ------------------------------------------------------------------------------
+# build-table: construct a data table for exploratory data analysis
 #
+# Input:  expression matrix (input for EBSeq); EBSeq output file; .bam alignment
+#         files produced by RSEM; reference sequences
+# Output: data table, each row corresponding to a reference sequence with the
+#         following columns
+#   - reference sequence label/ID
+#   - length (bp)
+#   - PPEE (posterior prob. of being equally expressed) reported by EBSeq
+#   - PPDE (posterior prob. of being differentially expressed) reported by EBSeq
+#   - PostFC (posterior fold change) reported by EBSeq
+#   - RealFC (fold change) reported by EBSeq
+#   - magnitude of PostFC (that is, 1/PostFC if PostFC < 1)
+#   - magnitude of RealFC (that is, 1/RealFC if RealFC < 1)
+#   - reads mapped for each replicate in condition 1 (one column per rep)
+#   - reads mapped for each replicate in condition 2 (one column per rep)
+#   - estimated expression level for each replicate in condition 1 (one column
+#     per rep)
+#   - estimated expression level for each replicate in condition 2 (one column
+#     per rep)
+#   - estimated expression level (normalized for library size by MedianNorm) for
+#     each replicate in condition 1 (one column per rep)
+#   - estimated expression level (normalized for library size by MedianNorm) for
+#     each replicate in condition 2 (one column per rep)
+#   - mean of normalized expression levels for condition 1
+#   - standard deviation of normalized expression levels for condition 1
+#   - variation coefficient of normalized expression levels for condition 1
+#   - mean of normalized expression levels for condition 2
+#   - standard deviation of normalized expression levels for condition 2
+#   - variation coefficient of normalized expression levels for condition 2
+#
+# If there are N replicates in condition 1 and M replicates in condition 2 the
+# output table should have 14 + (3 * (N + M)) columns.
 # ------------------------------------------------------------------------------
 
 

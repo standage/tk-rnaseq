@@ -16,7 +16,7 @@
 
 
 # ------------------------------------------------------------------------------
-# expcv: calculate coefficient of variance for a matrix of expression values
+# expcv: calculate coefficient of variation for a matrix of expression values
 # ------------------------------------------------------------------------------
 
 
@@ -33,17 +33,14 @@ library("getopt")
 print_usage <- function(file=stderr())
 {
   cat("
-expcv: calculate coefficient of variance for a matrix of expression values; see 
-           the source code for a full description of the program inputs and
-           outputs
-
-Usage: heatmaker [options] < data-matrix.txt
+expcv: calculate coefficient of variation for a matrix of expression values
+Usage: expcv [options] < data-matrix.txt
   Options:
     -H|--noheader               indicate that data matrix has no header row
     -h|--help:                  print this message and exit
-    -n|--norm: FILE             data matrix to be used for computing library size
-                                factors using normalization by median; default is no
-                                normalization
+    -n|--norm: FILE             data matrix to be used for computing library
+                                size factors using normalization by median;
+                                default is no normalization
     -s|--numsamples: INT,INT    the number of samples in each of the two
                                 conditions; if not provided explicitly, program
                                 will attempt to guess the number of samples per
@@ -64,7 +61,11 @@ if(!is.null(opt$help))
   print_usage(file=stdout())
   q(save="no", status=0)
 }
-if( is.null(opt$noheader) )  { opt$hasheader <- TRUE } else { opt$hasheader <- FALSE }
+if(is.null(opt$noheader)) {
+  opt$hasheader <- TRUE
+} else {
+  opt$hasheader <- FALSE
+}
 
 data <- read.table(file="stdin", header=opt$hasheader, sep="\t")
 row.names(data) <- data[,1]
@@ -82,7 +83,7 @@ if( is.null(opt$numsamples) )
   }
   else
   {
-    cat(paste("error: cannot guess number of samples for each condition; please",
+    cat(paste("error: cannot guess number of reps for each condition; please",
               "provide this information\n"),
         file=stderr())
     print_usage(file=stderr())

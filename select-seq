@@ -2,7 +2,11 @@
 use strict;
 use Bio::SeqIO;
 
-my $usage = "perl $0 seqlist.txt seqs.fasta";
+# ------------------------------------------------------------------------------
+# select-seq: extract sequences by ID from a Fasta file.
+# ------------------------------------------------------------------------------
+
+my $usage = "perl $0 seqidlist.txt seqs.fasta";
 my $seqlist = shift(@ARGV) or die("Usage: $usage");
 my $seqfile = shift(@ARGV) or die("Usage: $usage");
 

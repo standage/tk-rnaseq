@@ -26,16 +26,16 @@ use strict;
 # this information.
 # ------------------------------------------------------------------------------
 
-$_ = <STDIN>;
-chomp;
-s/"//g;
-$_ .= "\tMagPostFC\tMagRealFC\n";
-print;
+my $line = <STDIN>;
+chomp($line);
+$line =~ s/"//g;
+$line .= "\tMagPostFC\tMagRealFC\n";
+print $line;
 
-while(<STDIN>)
+while($line = <STDIN>)
 {
-  s/"//g;
-  my @fields = split(/\t/);
+  $line =~ s/"//g;
+  my @fields = split(/\t/, $line);
   my $magpfc = $fields[3];
   my $magrfc = $fields[4];
   if($magpfc < 1)

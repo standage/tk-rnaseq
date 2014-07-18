@@ -15,46 +15,14 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 # ------------------------------------------------------------------------------
-# This program is used to filter sequences for use in a differential expression
-# analysis. An initial analysis is used to build a table consisting of several
-# values for each molecule (gene, transcript, etc), including number of reads
-# mapped for each sample, estimated expression values, fold changes, and so on.
-# This data is then provided as input to this program, which will filter based
-# on user-selected criteria. Filtering is used primarily to remove molecules
-# that have too little data to make reliable calls or have to much data that
-# they are clear outliers and should be excluded.
-#
-# Expected input is a tab-delimited text file with one row for each molecule
-# (gene, transcript, etc) and the following columns for each row.
-#
-#   - ID
-#   - Length (bp)
-#   - posterior probability of being equally expressed across conditions
-#     (PPEE reported by EBSeq)
-#   - posterior probability of being differentially expressed across conditions
-#     (PPDE reported by EBSeq)
-#   - posterior fold change (PostFC reported by EBSeq)
-#   - fold change (RealFC reported by EBSeq)
-#   - magnitude of PostFC (that is, 1/PostFC if PostFC < 1)
-#   - magnitude of RealFC (that is, 1/RealFC if RealFC < 1)
-#   - N columns containing the number of reads mapping to the molecule from each
-#     of the N samples/replicates in condition 1
-#   - M columns containing the number of reads mapping to the molecule from each
-#     of the M samples/replicates in condition 2
-#   - N columns containing the estimated expression values for the molecule from
-#     each of the N samples/replicates in condition 1
-#   - M columns containing the estimated expression values for the molecule from
-#     each of the M samples/replicates in condition 2
-#   - N columns containing the normalized expression values for the molecule (as
-#     determined by MedianNorm) from each of the N samples/replicates in
-#     condition 1
-#   - M columns containing the normalized expression values for the molecule (as
-#     determined by MedianNorm) from each of the M samples/replicates in
-#     condition 2
-#
-# The total number of columns in the matrix should be 8 + (3*(N+M)). For
-# example, if you have 6 replicates for condition 1 and 6 for condition 2, there
-# should be 8 + (3*(6+6)) = 8 + 36 = 44 columns in the matrix.
+# This program is used to apply filters to sequences to be used in a
+# differential expression analysis. Following a preliminary differential
+# expression analysis, the 'build-table' script is used to (you guessed it)
+# build a table containing information about each reference sequence (gene,
+# transcript, etc), such as the number of reads mapped, estimated expression
+# levels, fold changes, and so on (for more information, see the source code for
+# the 'build-table' script). This script is then used to filter the sequences
+# based on user-supplied criteria.
 # ------------------------------------------------------------------------------
 
 library("getopt")
@@ -68,8 +36,8 @@ de-filter: analyze mapping data to filter genes or transcripts in a differential
 Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
   Options:
     -D|--density: REAL,REAL      for each condition, the read density for each
-                                 molecule is calculated by taking the sum of
-                                 reads mapped across all replicates and
+                                 reference sequence is calculated by taking the
+                                 sum of reads mapped across all replicates and
                                  normalizing by molecule length; this option
                                  specifies an acceptable range for this value;
                                  molecules with read density outside this range
@@ -77,15 +45,15 @@ Usage: de-filter [options] < de-table.txt > filtered-de-table.txt
                                  filtering)
     -h|--help                    print this help message and exit
     -H|--noheader                input file has no header
-    -s|--numsamples: INT,INT     the number of samples in each of the two
+    -s|--numsamples: INT,INT     the number of replicates for each of the two
                                  conditions; if not provided explicitly, program
-                                 will attempt to guess the number of samples per
-                                 condition (total/2 samples each; will exit
-                                 gracefully if total is odd)
+                                 will attempt to guess the number of reps per
+                                 condition (total/2 reps each; will exit
+                                 stubbornly but gracefully if total is odd)
     -r|--reads: INT,INT          for each condition, the number of reads mapped
-                                 to each molecule is summed across all
+                                 to each reference sequence is summed across all
                                  replicates; this option specifies an acceptable
-                                 range for this value; molecules with more or
+                                 range for this value; sequences with more or
                                  fewer mapped reads than specified will be
                                  discarded; default is 0,Inf (i.e. no filtering)
     -v|--varcoef: REAL           specify maximum threshold for the variation

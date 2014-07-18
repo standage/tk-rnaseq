@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 
-# Copyright (c) 2013-2104, Daniel S. Standage <daniel.standage@gmail.com>
+# Copyright (c) 2013-2014, Daniel S. Standage <daniel.standage@gmail.com>
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -19,7 +19,7 @@ use Getopt::Long;
 
 
 # ------------------------------------------------------------------------------
-# This script is motivated by a task that frequently comes up in my research. I
+# This script is motivated by a task that comes up daily in my research. I
 # often need to use a list of values stored in one file to retrieve data from
 # another file. Loading the data into an SQL database isn't an appealing option
 # most of the time, so this script is my attempt at solving the general problem.

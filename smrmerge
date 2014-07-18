@@ -10,4 +10,3 @@ do
   paste $out <(cut -f 2 $file) > ${out}.temp
   mv ${out}.temp $out
 done
-
