@@ -1,0 +1,133 @@
+#!/usr/bin/env Rscript
+
+# Copyright (c) 2014, Daniel S. Standage <daniel.standage@gmail.com>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+
+# ------------------------------------------------------------------------------
+# bully: given a matrix of expression values from a 2-condition contrast,
+#        determine and report the replicate from each condition that is most
+#        similar to the other condition.
+# ------------------------------------------------------------------------------
+
+
+# MedianNorm borrowed from the EBSeq library version 1.1.6
+# See http://www.bioconductor.org/packages/devel/bioc/html/EBSeq.html
+MedianNorm <- function(data)
+{
+  geomeans <- exp( rowMeans(log(data)) )
+  apply(data, 2, function(cnts) median((cnts/geomeans)[geomeans > 0]))
+}
+
+library("getopt")
+
+print_usage <- function(file=stderr())
+{
+  cat("
+bully: report replicate from each condition that is most similar to the other
+       condition
+
+Usage: bully [options] < data-matrix.txt
+  Options:
+    -h|--help:              print this message and exit
+                            default is 'heatmap.png'
+    -n|--norm: FILE         data matrix to be used for computing library size
+                            factors using normalization by median; default is no
+                            normalization
+    -r|--numreps: INT,INT   the number of replicates in each condition; default
+                            is half matrix size
+    -s|--samples: STR       a comma-separated list of sample labels to replace
+                            those in the data matrix file\n\n",
+    file=file)
+}
+
+spec <- matrix( c("help",    'h', 0, "logical",
+                  "norm",    'n', 1, "character",
+                  "numreps", 'r', 1, "character",
+                  "samples", 's', 1, "character"),
+                byrow=TRUE, ncol=4)
+
+opt <- getopt(spec)
+if(!is.null(opt$help))
+{
+  print_usage(file=stdout())
+  q(save="no", status=0)
+}
+
+data <- read.table(file="stdin", header=TRUE, sep="\t")
+row.names(data) <- data[,1]
+dimensions <- dim(data)
+data <- data[,2:dimensions[2]]
+nsamples <- dim(data)[2]
+
+if(!is.null(opt$samples))
+{
+  colnames(data) <- unlist(strsplit(opt$samples, ","))
+}
+
+if(is.null(opt$numreps))
+{
+  half.nsamples <- asl.integer(nsamples / 2)
+  if(nsamples %% 2 == 0)
+  {
+    opt$numreps <- sprintf("%d,%d", half.nsamples, half.nsamples)
+  }
+  else
+  {
+    cat(paste("error: cannot guess number of reps for each condition; please",
+              "provide this information\n"),
+        file=stderr())
+    print_usage(file=stderr())
+    q(save="no", status=1)
+  }
+}
+nreps <- as.integer(unlist(strsplit(opt$numreps, ",")))
+
+if(!is.null(opt$norm))
+{
+  norm.data <- data.matrix(read.table(opt$norm))
+  factors <- MedianNorm(norm.data)
+  data <- t(apply(data, 1, function(x){return(x/factors)}))
+}
+
+c1 <- vector()
+for(i in 1:nreps[1])
+{
+  c1[i] <- 0
+  for(j in (nreps[1]+1):nsamples)
+  {
+    c1[i] <- c1[i] + as.numeric(dist(rbind(data[,i], data[,j])))
+  }
+}
+
+c2 <- vector()
+for(i in 1:nreps[1])
+{
+  c2[i]	<- 0
+  for(j in 1:nreps[1])
+  {
+    c2[i] <- c2[i] + as.numeric(dist(rbind(data[,i+nreps[1]], data[,j])))
+  }
+}
+
+c1.min <- which.min(c1)
+c2.min <- which.min(c2)
+
+if(!is.null(opt$samples))
+{
+  c1.min <- colnames(data)[c1.min]
+  c2.min <- colnames(data)[nreps[1]+c2.min]  
+}
+
+cat(sprintf("Condition 1: %s\nCondition 2: %s\n", c1.min, c2.min))
