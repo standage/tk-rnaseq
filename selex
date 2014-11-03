@@ -43,6 +43,7 @@ selex: pull out needles from your tabular haystack!
 Usage: selex [options] needles haystack
   Options:
     -d|--delim: CHAR     delimiter for 'haystacks' file; default is tab
+    -H|--header:         treat the 1st line of the 'haystacks' file as a header
     -h|--help            print this help message and exit
     -k|--hkey: INT       field from the 'haystack' file that should be used to
                          match the key from the 'needles' file; default is 0
@@ -60,6 +61,7 @@ Usage: selex [options] needles haystack
 
 # Parse command line options
 my $hdelim = "\t";
+my $header = 0;
 my $hkey   = 0;
 my $ndelim = "\t";
 my $nkey   = 0;
@@ -68,6 +70,7 @@ GetOptions
 (
   "d|delim=s"  => \$hdelim,
   "h|help"     => sub { print_usage(\*STDOUT); exit(0); },
+  "H|header"   => \$header,
   "k|hkey=i"   => \$hkey,
   "m|ndelim=s" => \$ndelim,
   "n|nkey=i"   => \$nkey,
@@ -103,6 +106,11 @@ close($NDL);
 
 # Iterate through haystack, print entries whose keys match a needle
 open(my $HAY, "<", $haystackfile) or die("error opening file '$haystackfile'");
+if($header)
+{
+  my $h = <$HAY>;
+  print $h;
+}
 while(my $line = <$HAY>)
 {
   chomp($line);
